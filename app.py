@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import random
 
-# 必須放在最前面！設定網頁標題與圖示
+# 設定網頁標題與圖示
 st.set_page_config(page_title="IoT 安全驗證系統", page_icon="🔒", layout="centered")
 
 # --- 核心邏輯函數 ---
@@ -47,7 +47,7 @@ with st.sidebar:
 # 產生挑戰區塊
 if st.button("🚀 產生隨機挑戰 (Generate Challenge)"):
     c_code, proof_val = generate_vrf_challenge(sk, seed_input)
-    # 把結果存進 session_state，讓它跨越網頁重整
+    # 把結果存進 session_state，跨越網頁重整
     st.session_state.current_challenge = c_code
     
     st.success("成功產出隨機挑戰碼！")
@@ -62,7 +62,7 @@ if st.button("🚀 產生隨機挑戰 (Generate Challenge)"):
 
     st.info("💡 此 C 將透過 MQTT 發送至 Node 端進行 PUF 比對。")
 
-# --- 硬體容錯測試區 (依賴 Session State) ---
+# --- 硬體容錯測試區 (Session State) ---
 st.divider()
 st.subheader("🛡️ IoT 硬體容錯測試 (雜訊處理)")
 
