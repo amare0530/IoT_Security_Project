@@ -29,15 +29,12 @@ import streamlit as st
 import hashlib
 import hmac
 import random
-import paho.mqtt.client as mqtt
 import json
 import time
 import pandas as pd
-import threading
 import sqlite3
 from datetime import datetime
 import os
-from queue import Queue
 import traceback
 
 # ═══════════════════════════════════════════════════════════════
@@ -299,94 +296,134 @@ def generate_vrf_challenge(private_key, seed):
 if "current_challenge" not in st.session_state:
     st.session_state.current_challenge = None
 
-if "latest_mqtt_response" not in st.session_state:
-    st.session_state.latest_mqtt_response = None
+if "bridge_status" not in st.session_state:
+    st.session_state.bridge_status = "未知🚀"
 
-if "mqtt_listener_started" not in st.session_state:
-    st.session_state.mqtt_listener_started = False
+# ==========================================
+# File-based IPC (與 mqtt_bridge.py 通信)
+# ==========================================
 
-if "mqtt_status" not in st.session_state:
-    st.session_state.mqtt_status = "未連接"
+import os, json, time
 
-if "mqtt_error" not in st.session_state:
-    st.session_state.mqtt_error = None
+OUT_FILE = "response_in.json"
+IN_FILE = "challenge_out.json"
 
-if "response_queue" not in st.session_state:
-    st.session_state.response_queue = Queue()
+def get_latest_response():
+    try:
+        if os.path.exists(OUT_FILE):
+            with open(OUT_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                resp = data.get("response")
+                recv_time = data.get("received_time")
+                if resp and recv_time:
+                    return resp, recv_time
+    except Exception:
+        pass
+    return None, None
 
-# ═══════════════════════════════════════════════════════════════
-# 【MQTT 後台監聽線程】
-# ═══════════════════════════════════════════════════════════════
+def clear_response():
+    try:
+        with open(OUT_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+    except:
+        pass
 
-def start_mqtt_listener():
-    """啟動 MQTT 監聽線程（改進的異常處理）"""
-    
-    def mqtt_on_message(client, userdata, msg):
-        """MQTT 回調函數"""
-        try:
-            payload = json.loads(msg.payload.decode('utf-8'))
-            st.session_state.latest_mqtt_response = payload
-            st.session_state.response_queue.put(payload)
-        except json.JSONDecodeError as e:
-            st.session_state.mqtt_error = f"JSON 解析失敗: {str(e)}"
-        except Exception as e:
-            st.session_state.mqtt_error = f"處理訊息失敗: {str(e)}"
-    
-    def mqtt_on_connect(client, userdata, flags, rc):
-        """MQTT 連接回調"""
-        if rc == 0:
-            st.session_state.mqtt_status = "已連接"
-            st.session_state.mqtt_error = None
-            client.subscribe("fujen/iot/response")
-        else:
-            st.session_state.mqtt_status = f"連接失敗 (代碼: {rc})"
-            client.subscribe("fujen/iot/response")
-    
-    def mqtt_on_disconnect(client, userdata, rc):
-        """MQTT 斷開回調"""
-        if rc != 0:
-            st.session_state.mqtt_status = "非正常斷開"
-        else:
-            st.session_state.mqtt_status = "已斷開"
-    
-    def mqtt_listener_worker():
-        """MQTT 監聽工作線程"""
-        try:
-            client = mqtt.Client(client_id=f"IoT_Server_{int(time.time())}")
-            client.on_message = mqtt_on_message
-            client.on_connect = mqtt_on_connect
-            client.on_disconnect = mqtt_on_disconnect
-            
-            # 設置連接超時
-            client.connect("broker.emqx.io", 1883, keepalive=60)
-            st.session_state.mqtt_status = "連接中..."
-            
-            client.loop_forever()
-        except ConnectionRefusedError:
-            st.session_state.mqtt_status = "無法連接 Broker"
-            st.session_state.mqtt_error = "核查網路連線和 Broker 地址"
-        except Exception as e:
-            st.session_state.mqtt_status = "MQTT 異常"
-            st.session_state.mqtt_error = str(e)
-    
-    # 啟動背景線程
-    if not st.session_state.mqtt_listener_started:
-        try:
-            thread = threading.Thread(target=mqtt_listener_worker, daemon=True)
-            thread.start()
-            st.session_state.mqtt_listener_started = True
-        except Exception as e:
-            st.error(f"❌ 無法啟動 MQTT 線程: {str(e)}")
+def send_challenge_to_bridge(challenge, noise_level=3):
+    try:
+        with open(IN_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "challenge": challenge,
+                "noise_level": noise_level,
+                "timestamp": time.time()
+            }, f, indent=2)
+        return True
+    except Exception as e:
+        import streamlit as st
+        st.error(f"發送 Challenge 失敗: {e}")
+        return False
 
-# 啟動 MQTT 監聽
-start_mqtt_listener()
-
-# ═══════════════════════════════════════════════════════════════
-# 【主頁面介面】
-# ═══════════════════════════════════════════════════════════════
 
 st.title("🔒 IoT 設備硬體指紋認證系統")
 st.subheader("基於 VRF + PUF + Hamming Distance 的安全驗證平台")
+
+# ═══════════════════════════════════════════════════════════════
+# 【MQTT 實時診斷面板】
+# ═══════════════════════════════════════════════════════════════
+
+with st.expander("Bridge 連線狀態與測試", expanded=True):
+    col_d1, col_d2, col_d3 = st.columns(3)
+
+    with col_d1:
+        st.markdown("**Bridge 狀態**")
+        st.success("✅ IPC 模式已啟用")
+
+    with col_d2:
+        st.markdown("**最後 Response**")
+        latest_resp, last_time = get_latest_response()
+        if latest_resp is not None and last_time is not None:
+            time_ago = time.time() - last_time
+            st.success(f"約 {time_ago:.1f} 秒前")
+        else:
+            st.warning("尚未收到")
+
+    with col_d3:
+        st.markdown("**手動操作**")
+        if st.button("刷新 UI", key="refresh_ui", use_container_width=True): 
+            st.rerun()
+
+    st.divider()
+
+    col_test1, col_test2 = st.columns(2)
+
+    with col_test1:
+        st.markdown("### 發送測試訊息")
+        if st.button("發送 Response 測試", key="mqtt_test_send", use_container_width=True):
+            try:
+                test_response = {
+                    "device_id": "TEST_DEVICE",
+                    "response": "a1b2c3d4e5f6" * 10 + "a1b2c3d4e5f6",
+                    "timestamp": time.time(),
+                    "noise_level": 3,
+                    "status": "test"
+                }
+
+                # 把模擬回應直接寫入檔案
+                with open(OUT_FILE, "w", encoding="utf-8") as f:
+                    json.dump({"response": test_response, "received_time": time.time()}, f, ensure_ascii=False)
+                
+                st.success("✅ 測試訊息已儲存 (模擬)")
+                st.info("請檢查下方是否出現 Response...")
+            except Exception as e:
+                st.error(f"❌ ERROR: {str(e)}")
+
+    with col_test2:
+        st.markdown("### 收到的訊息")
+        latest_resp, _ = get_latest_response()
+        if latest_resp is not None:
+            st.success("✅ 已收到")
+            st.json(latest_resp)
+        else:
+            st.warning("⏳ 未收到任何訊息")
+
+    st.divider()
+    latest_resp, _ = get_latest_response()
+    if latest_resp is not None:
+        st.markdown("### 收到的 Response:")
+        st.json(latest_resp)
+    else:
+        st.info("等待 Response...")
+st.divider()
+    
+# 顯示詳細 Response 內容
+latest_resp, _ = get_latest_response()
+if latest_resp is not None:
+    st.markdown("### 📊 收到的 Response:")
+    st.json(latest_resp)
+else:
+    st.info("⏳ 等待 Response...")
+    st.code("# 步驟: \n1. 點擊「生成新挑戰碼」\n2. 點擊「📤 發送至 Node 端」\n3. 等待 3-5 秒\n4. 點擊「🔍 檢查並驗證」", language="python")
+
+st.divider()
 
 # 創建分頁
 tab1, tab2, tab3, tab4 = st.tabs(["🔐 認證系統", "📊 歷史記錄", "📈 實驗統計", "⚙️ 系統狀態"])
@@ -443,23 +480,22 @@ with tab1:
     with col_send:
         if st.button("📡 發送至 Node 端", key="send_challenge"):
             if not st.session_state.current_challenge:
-                st.error("❌ 請先生成 Challenge")
+                st.error("請先生成 Challenge")
             else:
                 try:
-                    client = mqtt.Client(client_id=f"IoT_Server_Send_{int(time.time())}")
-                    client.connect("broker.emqx.io", 1883, 60)
-                    
-                    payload = json.dumps({
-                        "challenge": st.session_state.current_challenge,
-                        "noise_level": 3
-                    })
-                    
-                    client.publish("fujen/iot/challenge", payload)
-                    client.disconnect()
-                    
-                    st.success("✅ Challenge 已發送至 Node 端")
+                    success = send_challenge_to_bridge(st.session_state.current_challenge, 3)
+
+                    if success:
+                        clear_response()
+                        st.session_state.challenge_sent_time = time.time()      
+                        st.success("✅ Challenge 已發送至 Bridge")
+                    else:
+                        st.error("❌ 發送失敗")
                 except Exception as e:
                     st.error(f"❌ 發送失敗: {str(e)}")
+                    print(f"[ERROR] 發送 Challenge 異常: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
     
     st.divider()
     
@@ -472,44 +508,101 @@ with tab1:
         if st.button("🔍 檢查並驗證", key="check_response"):
             if not st.session_state.current_challenge:
                 st.error("❌ 請先生成 Challenge")
-            elif st.session_state.latest_mqtt_response is None:
-                st.warning("⏳ 尚未收到 Response，請檢查 Node 連接")
+                print("[DEBUG] No current_challenge in session_state")
             else:
-                try:
-                    response_data = st.session_state.latest_mqtt_response
-                    response = response_data.get('response')
-                    device_id = response_data.get('device_id', 'Unknown')
+                # 從全局狀態讀取最新 Response
+                latest_response, last_update_time = get_latest_response()
+                print(f"[DEBUG] 檢查驗證 - 全局 Response: {latest_response is not None}, 時間: {last_update_time}")
+                
+                if latest_response is None:
+                    # 显示详细的诊断信息
+                    st.error("❌ 尚未收到 Response")
                     
-                    if response:
-                        hd = calculate_hamming_distance(st.session_state.current_challenge, response)
-                        threshold = 5
+                    # 诊断信息
+                    with st.expander("🔧 診斷信息", expanded=True):
+                        col_d1, col_d2 = st.columns(2)
                         
-                        if hd is not None:
-                            result = "pass" if hd <= threshold else "fail"
-                            
-                            # 保存到資料庫
-                            save_auth_result(
-                                device_id=device_id,
-                                challenge=st.session_state.current_challenge,
-                                response=response,
-                                hamming_distance=hd,
-                                threshold=threshold,
-                                result=result,
-                                noise_level=response_data.get('noise_level')
-                            )
-                            
-                            col_r1, col_r2 = st.columns(2)
-                            with col_r1:
-                                st.metric("漢明距離", f"{hd} bits")
-                            with col_r2:
-                                st.metric("容錯門檻", f"{threshold} bits")
-                            
-                            if result == "pass":
-                                st.success(f"✅ 認證通過")
+                        with col_d1:
+                            st.markdown("**MQTT 連接狀態**")
+                            st.info("ℹ️ 使用全局MQTT客戶端 (持久化)")
+                        
+                        with col_d2:
+                            st.markdown("**等待時間**")
+                            # 顯示 Challenge 發送時以來已等待多久
+                            if 'challenge_sent_time' in st.session_state:
+                                wait_time = time.time() - st.session_state.challenge_sent_time
+                                st.warning(f"⏳ 等待中... {wait_time:.1f}秒")
                             else:
-                                st.error(f"❌ 認證失敗")
-                except Exception as e:
-                    st.error(f"❌ 驗證失敗: {str(e)}")
+                                st.warning("尚未發送 Challenge")
+                        
+                        st.markdown("**可能的原因與排除步驟：**")
+                        st.markdown("""
+                        1. ❌ **Node 設備未運行**
+                           → 執行: `python node.py`
+                        
+                        2. ❌ **Challenge 未成功發送**
+                           → 檢查「📤 發送至 Node 端」是否顯示 ✅ 成功
+                           → 如未成功，重新點擊發送
+                        
+                        3. ❌ **Node 處理超時**
+                           → 等待 10-15 秒再試
+                           → 查看 Node 終端是否有日誌
+                        
+                        4. ❌ **Server 未訂閱 Response 主題**
+                           → 重新啟動 Streamlit: `streamlit run app.py`
+                        
+                        **快速診斷：**
+                        ```bash
+                        python mqtt_test.py
+                        ```
+                        """)
+                    
+                    print(f"[DEBUG] Global Response is None. Latest time: {last_update_time}")
+                
+                else:
+                    try:
+                        print(f"\n[DEBUG] ✅ 收到 Response！開始驗證")
+                        print(f"   Device ID: {latest_response.get('device_id')}")
+                        print(f"   Response: {str(latest_response.get('response'))[:40]}...")
+                        
+                        response_data = latest_response
+                        response = response_data.get('response')
+                        device_id = response_data.get('device_id', 'Unknown')
+                        
+                        if response:
+                            hd = calculate_hamming_distance(st.session_state.current_challenge, response)
+                            threshold = 5
+                            
+                            if hd is not None:
+                                result = "pass" if hd <= threshold else "fail"
+                                
+                                # 保存到資料庫
+                                save_auth_result(
+                                    device_id=device_id,
+                                    challenge=st.session_state.current_challenge,
+                                    response=response,
+                                    hamming_distance=hd,
+                                    threshold=threshold,
+                                    result=result,
+                                    noise_level=response_data.get('noise_level')
+                                )
+                                
+                                col_r1, col_r2 = st.columns(2)
+                                with col_r1:
+                                    st.metric("漢明距離", f"{hd} bits")
+                                with col_r2:
+                                    st.metric("容錯門檻", f"{threshold} bits")
+                                
+                                if result == "pass":
+                                    st.success(f"✅ 認證通過")
+                                else:
+                                    st.error(f"❌ 認證失敗")
+                        else:
+                            st.error("❌ Response 格式無效")
+                    except Exception as e:
+                        st.error(f"❌ 驗證失敗: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
     
     with col_manual:
         st.write("### 手動輸入驗證")
@@ -667,8 +760,7 @@ with tab4:
     col_status1, col_status2, col_status3 = st.columns(3)
     
     with col_status1:
-        mqtt_icon = "🟢" if "已連接" in st.session_state.mqtt_status else "🔴"
-        st.metric("MQTT 狀態", f"{mqtt_icon} {st.session_state.mqtt_status}")
+        st.metric("Bridge 狀態", "🟢 IPC 啟用中")
     
     with col_status2:
         db_size = os.path.getsize(DB_PATH) / 1024 if os.path.exists(DB_PATH) else 0
@@ -678,8 +770,8 @@ with tab4:
         hist_count = len(get_auth_history(limit=100000))
         st.metric("認證記錄數", f"{hist_count}")
     
-    if st.session_state.mqtt_error:
-        st.error(f"❌ MQTT 錯誤: {st.session_state.mqtt_error}")
+    pass
+    pass
     
     st.divider()
     st.write("**📊 系統資訊**")
