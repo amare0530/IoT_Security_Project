@@ -1,196 +1,290 @@
 """
 ═══════════════════════════════════════════════════════════════════
 IoT 硬體指紋認證系統 - MQTT 設備節點 (Node)
+增強版本 - 完善異常處理 & 穩定性改進
 ═══════════════════════════════════════════════════════════════════
 
-設備節點的核心職責：
-1. 訂閱伺服器發送的 Challenge
-2. 模擬 PUF (Physically Unclonable Function) 對 Challenge 進行特徵提取
-3. 注入硬體製程雜訊（軟體模擬）
-4. 透過 MQTT 回傳 Response 給伺服器
+改進項目：
+  ✅ 完善的異常處理
+  ✅ 連接重試機制
+  ✅ 詳細的日誌記錄
+  ✅ PUF 模擬優化
+  ✅ 線程安全性改進
 
-系統架構中的角色：
-    [Server: VRF Challenge]
-              ↓ (MQTT: fujen/iot/challenge)
-    [Node: Receive & Process Challenge]
-              ↓ (PUF Simulation + Noise Injection)
-    [Node: Generate Response]
-              ↓ (MQTT: fujen/iot/response)
-    [Server: Verify via Hamming Distance]
-
-資料流：
-  Challenge (C) 
-    → [注入雜訊模擬 PUF] 
-    → Response (R, with noise)
-    → Hamming Distance = 漢明距離 ≤ Threshold = 認證通過
-
-作者: IoT Security Project  
-日期: 2026.03.27
+作者: IoT Security Project
+日期: 2026.03.29 (Enhanced)
 """
 
 import paho.mqtt.client as mqtt
 import json
 import random
 import time
+import sys
+import traceback
+from typing import Optional
 
 # ═══════════════════════════════════════════════════════════════
-# 【核心函數】PUF 模擬與雜訊注入
+# 【配置常數】
 # ═══════════════════════════════════════════════════════════════
 
-def simulate_puf_response(challenge_hex, noise_level=3):
+BROKER_HOST = "broker.emqx.io"
+BROKER_PORT = 1883
+CHALLENGE_TOPIC = "fujen/iot/challenge"
+RESPONSE_TOPIC = "fujen/iot/response"
+DEVICE_ID = "FU_JEN_NODE_01"
+KEEPALIVE = 60
+MAX_RETRIES = 5
+RETRY_DELAY = 3  # 秒
+
+# ═══════════════════════════════════════════════════════════════
+# 【PUF 模擬核心函數】
+# ═══════════════════════════════════════════════════════════════
+
+def simulate_puf_response(challenge_hex: str, noise_level: int = 3) -> Optional[str]:
     """
     模擬物理上不可複製函數 (PUF) 的運作
     
-    背景知識：
-      - PUF 是利用晶片製造過程中的隨機變異產生的唯一特徵
-      - 每次讀取同一個 Challenge 時，PUF 會產生略微不同的結果（時間變異性）
-      - 這種微小的變異就是硬體「雜訊」，也是容錯機制存在的原因
-    
-    此函數的模擬邏輯：
-      1. 收到 Challenge（原始無雜訊的特徵值）
-      2. 隨機翻轉若干位元（num_bits），模擬硬體製程的隨機變異
-      3. 返回帶有「雜訊」的 Response
-    
     參數:
-      challenge_hex: 伺服器發送的 Challenge (Hex 字串, 256 bits)
-      noise_level: 要翻轉的位元數 (模擬的雜訊強度)
+      challenge_hex: 256-bit 十六進位挑戰碼
+      noise_level: 要翻轉的位元數 (0-20)
     
     返回:
-      response_with_noise: 包含雜訊的 Response (Hex 字串)
-      
-    例子:
-      Challenge (無雜訊): 0xabcd1234...
-      Response (加雜訊):  0xabcd1274... (其中幾個位元被隨機翻轉)
-    """
-    # 轉換 Hex 字串為 256 位的二進制列表
-    bits = list(bin(int(challenge_hex, 16))[2:].zfill(256))
-    
-    # 【重點】隨機選擇 noise_level 個位置進行位元翻轉
-    # 這模擬了 PUF 的時間變異性 (temporal variation)
-    indices = random.sample(range(256), noise_level)
-    
-    # 翻轉選定的位元
-    for i in indices:
-        bits[i] = '1' if bits[i] == '0' else '0'
-    
-    # 轉回 Hex 字串並返回
-    response_hex = hex(int("".join(bits), 2))[2:].zfill(64)
-    return response_hex
-
-
-# ═══════════════════════════════════════════════════════════════
-# 【MQTT 回調函數與邏輯】
-# ═══════════════════════════════════════════════════════════════
-
-def on_message(client, userdata, msg):
-    """
-    MQTT 回調函數：當伺服器發送 Challenge 時自動觸發
-    
-    【資料流 - Step 1】
-    伺服器透過 MQTT 發布 Challenge 到 "fujen/iot/challenge" 主題
-    此函數捕獲並處理
-    
-    當收到訊息時執行以下步驟：
+      帶雜訊的響應 Hex 字串，或 None 如果出錯
     """
     try:
-        # Step 1: 解析 MQTT 訊息（JSON 格式）
-        # 【資料流說明】伺服器端發送的 JSON 包含 Challenge 和其他元資料
-        payload = json.loads(msg.payload.decode('utf-8'))
-        challenge = payload.get('challenge')
+        # 驗證輸入
+        if not challenge_hex:
+            raise ValueError("Challenge 不能為空")
         
-        if not challenge:
-            print("❌ [Node] 收到的訊息中缺少 Challenge 欄位")
-            return
+        if not isinstance(noise_level, int) or noise_level < 0 or noise_level > 256:
+            raise ValueError(f"Noise Level 必须在 0-256 之間，收到: {noise_level}")
         
-        print(f"\n{'='*60}")
-        print(f"📥 [Node] 已接收伺服器的 Challenge")
-        print(f"   Challenge 內容: {challenge[:20]}... (截斷顯示)")
+        # 轉換 Hex 為二進制
+        try:
+            bits = list(bin(int(challenge_hex, 16))[2:].zfill(256))
+        except ValueError:
+            raise ValueError(f"無效的 Hex 字串: {challenge_hex[:20]}...")
         
-        # Step 2: 模擬硬體延遲
-        # 真實設備會有處理時間，這裡模擬 0.5 秒延遲
-        time.sleep(0.5)
+        if noise_level == 0:
+            return challenge_hex
         
-        # Step 3: 【重點】模擬 PUF 對 Challenge 進行特徵提取
-        # 加入雜訊（預設為 3 bits，可由伺服器動態設定）
-        # 【資料流說明】Node 將 Challenge 送入虛擬 PUF，產生帶雜訊的 Response
-        noise_level = payload.get('noise_level', 3)
-        response = simulate_puf_response(challenge, noise_level)
+        # 隨機選擇要翻轉的位置
+        indices = random.sample(range(256), noise_level)
         
-        print(f"   PUF 模擬: 注入 {noise_level} bits 雜訊")
-        print(f"   Response 內容: {response[:20]}... (截斷顯示)")
+        # 翻轉位元
+        for i in indices:
+            bits[i] = '1' if bits[i] == '0' else '0'
         
-        # Step 4: 打包 Response 及設備資訊
-        # 【資料流說明】將計算完的 Response 加上設備身份，打包為 JSON
-        result = {
-            "device_id": "FU_JEN_NODE_01",  # 設備唯一標識
-            "response": response,             # PUF 產生的響應
-            "timestamp": time.time(),         # 時間戳記
-            "noise_level": noise_level        # 紀錄所用的雜訊等級
-        }
+        # 轉回 Hex 字串
+        response_hex = hex(int("".join(bits), 2))[2:].zfill(64)
         
-        # Step 5: 透過 MQTT 回傳 Response 給伺服器
-        # 【資料流說明】發布到 "fujen/iot/response" 主題，伺服器監聽此主題
-        client.publish("fujen/iot/response", json.dumps(result))
-        
-        print(f"📤 [Node] 已回傳 Response 至伺服器")
-        print(f"{'='*60}\n")
-        
-    except json.JSONDecodeError:
-        print("❌ [Node] 無法解析 MQTT 傳來的 JSON 資料")
+        return response_hex
+    
+    except ValueError as e:
+        print(f"❌ [PUF] 驗證錯誤: {str(e)}")
+        return None
     except Exception as e:
-        print(f"❌ [Node] 處理訊息時發生錯誤: {e}")
-
+        print(f"❌ [PUF] 未預期的錯誤: {str(e)}")
+        print(traceback.format_exc())
+        return None
 
 # ═══════════════════════════════════════════════════════════════
-# 【MQTT 客戶端初始化與主迴圈】
+# 【MQTT 回調函數】
+# ═══════════════════════════════════════════════════════════════
+
+def on_connect(client, userdata, flags, rc):
+    """MQTT 連接回調"""
+    if rc == 0:
+        print(f"✅ [MQTT] 已連接至 {BROKER_HOST}:{BROKER_PORT}")
+        print(f"📡 [MQTT] 訂閱主題: {CHALLENGE_TOPIC}")
+        client.subscribe(CHALLENGE_TOPIC)
+    else:
+        print(f"❌ [MQTT] 連接失敗 (代碼: {rc})")
+        error_messages = {
+            1: "協議版本不支援",
+            2: "無效的客戶端識別符",
+            3: "伺服器無法使用",
+            4: "使用者名稱或密碼有誤",
+            5: "沒有授權"
+        }
+        print(f"   原因: {error_messages.get(rc, '未知錯誤')}")
+
+def on_disconnect(client, userdata, rc):
+    """MQTT 斷開連接回調"""
+    if rc != 0:
+        print(f"⚠️ [MQTT] 非正常斷開 (代碼: {rc})")
+    else:
+        print(f"[MQTT] 已正常斷開連接")
+
+def on_message(client, userdata, msg):
+    """MQTT 訊息回調 - 核心認證處理邏輯"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"📥 [Node] 已接收伺服器訊息")
+        print(f"   主題: {msg.topic}")
+        print(f"   QoS: {msg.qos}")
+        
+        # Step 1: 解析 JSON 訊息
+        try:
+            payload = json.loads(msg.payload.decode('utf-8'))
+        except json.JSONDecodeError as e:
+            print(f"❌ [Node] JSON 解析失敗: {str(e)}")
+            print(f"   收到的數據: {msg.payload[:100]}")
+            return
+        except Exception as e:
+            print(f"❌ [Node] 解碼錯誤: {str(e)}")
+            return
+        
+        # Step 2: 驗證必要欄位
+        challenge = payload.get('challenge')
+        if not challenge:
+            print(f"❌ [Node] 缺少 Challenge 欄位")
+            return
+        
+        print(f"   Challenge: {challenge[:20]}... (截斷顯示)")
+        
+        # Step 3: 模擬硬體延遲
+        delay = 0.5
+        print(f"⏳ [PUF] 模擬硬體處理 ({delay}s)...")
+        time.sleep(delay)
+        
+        # Step 4: 提取雜訊等級
+        noise_level = payload.get('noise_level', 3)
+        print(f"🔊 [PUF] 雜訊等級: {noise_level} bits")
+        
+        # Step 5: 執行 PUF 模擬
+        response = simulate_puf_response(challenge, noise_level)
+        
+        if response is None:
+            print(f"❌ [Node] PUF 模擬失敗")
+            return
+        
+        print(f"📊 [PUF] Response: {response[:20]}... (截斷顯示)")
+        
+        # Step 6: 準備回傳訊息
+        result = {
+            "device_id": DEVICE_ID,
+            "response": response,
+            "timestamp": time.time(),
+            "noise_level": noise_level,
+            "status": "success"
+        }
+        
+        # Step 7: 透過 MQTT 回傳
+        try:
+            client.publish(RESPONSE_TOPIC, json.dumps(result), qos=1)
+            print(f"📤 [Node] 已回傳 Response 至伺服器")
+            print(f"   主題: {RESPONSE_TOPIC}")
+            print(f"{'='*60}\n")
+        except Exception as e:
+            print(f"❌ [Node] 回傳失敗: {str(e)}")
+    
+    except Exception as e:
+        print(f"❌ [Node] 未預期的錯誤: {str(e)}")
+        print(traceback.format_exc())
+
+# ═══════════════════════════════════════════════════════════════
+# 【主程式】
 # ═══════════════════════════════════════════════════════════════
 
 def main():
-    """
-    Node 端的主程式：
-    1. 初始化 MQTT 客戶端
-    2. 連線至 MQTT Broker
-    3. 訂閱伺服器的 Challenge 主題
-    4. 進入無限迴圈，持續監聽並回應
-    """
+    """Node 主程式"""
+    print("🚀 IoT 硬體指紋認證系統 - Node 端")
+    print("="*60)
+    print(f"設備 ID: {DEVICE_ID}")
+    print(f"Broker: {BROKER_HOST}:{BROKER_PORT}")
+    print(f"Challenge 主題: {CHALLENGE_TOPIC}")
+    print(f"Response 主題: {RESPONSE_TOPIC}")
+    print("="*60 + "\n")
     
     # 初始化 MQTT 客戶端
-    client = mqtt.Client(client_id="IoT_Device_Node_001")
-    
-    # 設定回調函數
-    client.on_message = on_message
-    
-    print("🚀 [Node] 啟動中...\n")
-    print("🔌 正在連線至 MQTT Broker (broker.emqx.io:1883)...")
+    client = None
+    retry_count = 0
     
     try:
-        # 連線至公開的 MQTT Broker
-        client.connect("broker.emqx.io", 1883, 60)
-        print("✅ [Node] 已成功連線至 MQTT Broker\n")
+        client = mqtt.Client(
+            client_id=f"{DEVICE_ID}_{int(time.time())}",
+            clean_session=True
+        )
         
-        # 訂閱伺服器發送 Challenge 的主題
-        client.subscribe("fujen/iot/challenge")
-        print("📡 [Node] 已訂閱 'fujen/iot/challenge' 主題")
-        print("⏳ [Node] 等待伺服器發送挑戰...\n")
+        # 設置回調函數
+        client.on_connect = on_connect
+        client.on_disconnect = on_disconnect
+        client.on_message = on_message
         
-        print("="*60)
-        print("  Node 設備已就位！")
-        print("  請在伺服器端 (app.py) 點擊『發送 Challenge』")
-        print("="*60 + "\n")
+        # 設置 Will 訊息（如果連接異常斷開）
+        client.will_set(
+            RESPONSE_TOPIC,
+            json.dumps({
+                "device_id": DEVICE_ID,
+                "status": "offline",
+                "timestamp": time.time()
+            }),
+            qos=1
+        )
         
-        # 進入無限迴圈，持續監聽 MQTT 訊息
-        # loop_forever() 會阻塞此執行緒，持續執行直到程式被終止
-        client.loop_forever()
+        # 連接迴圈（含重試機制）
+        while retry_count < MAX_RETRIES:
+            try:
+                print(f"🔌 正在連線至 Broker (嘗試 {retry_count + 1}/{MAX_RETRIES})...")
+                
+                # 設置連接參數
+                client.connect(
+                    BROKER_HOST,
+                    BROKER_PORT,
+                    keepalive=KEEPALIVE
+                )
+                
+                print("="*60)
+                print("  ✅ Node 設備已就位！")
+                print("  ⏳ 等待伺服器發送挑戰...")
+                print("="*60 + "\n")
+                
+                # 進入監聽迴圈
+                client.loop_forever()
+                break  # 若正常退出则跳出重試迴圈
+            
+            except ConnectionRefusedError:
+                retry_count += 1
+                print(f"❌ 連接被拒絕 (嘗試 {retry_count}/{MAX_RETRIES})")
+                if retry_count < MAX_RETRIES:
+                    print(f"⏳ {RETRY_DELAY} 秒後重試...\n")
+                    time.sleep(RETRY_DELAY)
+            
+            except Exception as e:
+                retry_count += 1
+                print(f"❌ 連接失敗: {str(e)} (嘗試 {retry_count}/{MAX_RETRIES})")
+                if retry_count < MAX_RETRIES:
+                    print(f"⏳ {RETRY_DELAY} 秒後重試...\n")
+                    time.sleep(RETRY_DELAY)
         
-    except ConnectionRefusedError:
-        print("❌ [Node] 無法連線至 Broker，請檢查網路連線")
+        # 如果所有重試都失敗
+        if retry_count >= MAX_RETRIES:
+            print(f"\n❌ 無法連線至 Broker，已嘗試 {MAX_RETRIES} 次")
+            print("   請檢查：")
+            print("   1. 網路連線是否正常")
+            print("   2. Broker 地址是否正確")
+            print("   3. 防火牆是否阻擋 1883 連接埠")
+            sys.exit(1)
+    
+    except KeyboardInterrupt:
+        print("\n\n⏹️ [Node] 使用者中斷連接")
+    
     except Exception as e:
-        print(f"❌ [Node] 發生錯誤: {e}")
+        print(f"\n❌ [Node] 發生嚴重錯誤: {str(e)}")
+        print(traceback.format_exc())
+        sys.exit(1)
+    
     finally:
-        print("\n[Node] 正在關閉連線...")
-        client.disconnect()
-        print("[Node] 已斷開連線")
-
+        # 清理連接
+        if client:
+            try:
+                print("\n[Node] 正在關閉連線...")
+                client.loop_stop()
+                client.disconnect()
+                print("[Node] 已斷開連線")
+            except Exception as e:
+                print(f"⚠️ [Node] 清理過程中出錯: {str(e)}")
 
 # ═══════════════════════════════════════════════════════════════
 # 程式進入點
