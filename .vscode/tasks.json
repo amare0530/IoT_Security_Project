@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "IoT: Start All (Preflight + Launch)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\start_all.ps1",
+        "-InstallDeps"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "IoT: Start All (Dry Run)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\start_all.ps1",
+        "-DryRun"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "IoT: Stop All",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\stop_all.ps1"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

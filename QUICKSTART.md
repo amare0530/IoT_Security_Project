@@ -2,6 +2,24 @@
 
 ## 一分鐘快速上手
 
+### Windows 一鍵檢查與啟動（推薦）
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps
+```
+
+停止全部程序：
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
+```
+
+只做檢查不啟動（Dry Run）：
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
+```
+
 ### 第一步：安裝依賴
 ```bash
 pip install -r requirements.txt

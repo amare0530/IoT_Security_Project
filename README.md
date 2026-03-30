@@ -205,6 +205,33 @@ plotly>=5.13.0           # 互動式圖表 (若需要)
 
 ## ⚙️ 快速啟動指南
 
+### Windows 一鍵自動啟動（含前置檢查）
+
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps
+```
+
+此腳本會自動檢查：
+- Python 不可指向 MSYS2 (`C:\msys64\...`)
+- 必要套件 (`paho-mqtt`, `streamlit`, `pandas`)
+- MQTT Broker 可達性 (`broker.emqx.io:1883`)
+- Streamlit 8501 連接埠是否可用
+
+停止全部程序：
+
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
+```
+
+只做檢查不啟動（Dry Run）：
+
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
+```
+
 ### 一分鐘快速上手
 
 **終端機 1 - 啟動伺服器**

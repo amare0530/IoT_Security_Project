@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: vrf
+Version: 1.0.7
+Summary: VRF with ability to validate
+Author: lucyfer
+Requires-Dist: coverage ==6.0.0
+Requires-Dist: ecdsa ==0.18.0
+Requires-Dist: pytest ==7.4.1
+Requires-Dist: setuptools ==71.0.1
+Requires-Dist: twine ==5.1.1
+
