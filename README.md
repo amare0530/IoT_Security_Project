@@ -217,6 +217,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -Ins
 - 必要套件 (`paho-mqtt`, `streamlit`, `pandas`)
 - MQTT Broker 可達性 (`broker.emqx.io:1883`)
 - Streamlit 8501 連接埠是否可用
+- `.venv` 是否可用（跨機器搬移導致失效時，會自動改用本機 Python，非 DryRun 時可自動重建 `.venv`）
 
 停止全部程序：
 
@@ -230,6 +231,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
 ```powershell
 cd C:\Programming\IoT_Security_Project
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
+```
+
+若要強制使用系統 Python（跳過 `.venv` 建立/修復）：
+
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps -SkipVenvBootstrap
 ```
 
 ### 一分鐘快速上手

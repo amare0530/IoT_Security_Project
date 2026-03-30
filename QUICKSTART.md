@@ -8,6 +8,11 @@ cd C:\Programming\IoT_Security_Project
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps
 ```
 
+說明：
+- `start_all.ps1` 會自動檢測 `.venv` 是否可用。
+- 若你的專案是從另一台電腦搬過來，舊 `.venv` 壞掉時會自動改用本機 Python（非 DryRun 模式下也可自動重建 `.venv`）。
+- 如需強制不用 `.venv`，可加上 `-SkipVenvBootstrap`。
+
 停止全部程序：
 ```powershell
 cd C:\Programming\IoT_Security_Project
@@ -18,6 +23,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
 ```powershell
 cd C:\Programming\IoT_Security_Project
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
+```
+
+只用系統 Python（跳過 `.venv` 建立/修復）：
+```powershell
+cd C:\Programming\IoT_Security_Project
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps -SkipVenvBootstrap
 ```
 
 ### 第一步：安裝依賴

@@ -34,11 +34,22 @@ Write-Info "Stopping $($unique.Count) process(es)"
 
 foreach ($p in $unique) {
     try {
+        $exists = Get-Process -Id $p.ProcessId -ErrorAction SilentlyContinue
+        if (-not $exists) {
+            Write-Info "PID $($p.ProcessId) already exited"
+            continue
+        }
+
         Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop
         Write-Ok "Stopped PID $($p.ProcessId): $($p.Name)"
     }
     catch {
-        Write-Warn "Failed to stop PID $($p.ProcessId): $($_.Exception.Message)"
+        if ($_.Exception.Message -match "找不到處理序識別元|Cannot find a process with the process identifier") {
+            Write-Info "PID $($p.ProcessId) already exited"
+        }
+        else {
+            Write-Warn "Failed to stop PID $($p.ProcessId): $($_.Exception.Message)"
+        }
     }
 }
 
