@@ -1,1 +1,10 @@
-{}
+{
+  "response": {
+    "device_id": "TEST_DEVICE",
+    "response": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+    "timestamp": 1774840258.0915627,
+    "noise_level": 3,
+    "status": "test"
+  },
+  "received_time": 1774840258.0915627
+}

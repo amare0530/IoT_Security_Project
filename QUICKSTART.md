@@ -19,19 +19,24 @@ python node.py
 ```
 看到「等待伺服器發送挑戰」即表示成功連線
 
-### 第四步：開始認證流程
+### 第四步：啟動 Bridge（終端 3）
+```bash
+python mqtt_bridge.py
+```
+看到「MQTT 背景監聽已啟動」與連線成功訊息即表示可開始傳輸
+
+### 第五步：開始認證流程
 
 在 Streamlit 網頁上按照順序點擊：
 
-1. **「生成新挑戰碼」** 
-   - 伺服器使用 VRF 生成隨機 Challenge
+1. **「🚀 一鍵驗證」**（推薦）
+  - 自動執行：生成 Challenge → 發送至 Node → 等待回應 → 驗證
+  - 完成後直接顯示漢明距離與認證結果
 
-2. **「發送至 Node 端」**
-   - Challenge 透過 MQTT 發送到 Node 設備
-
-3. **「檢查並驗證 Response」**
-   - Node 回傳 Response，伺服器自動驗證
-   - 顯示漢明距離和認證結果
+2. **分步操作**（進階）
+  - 「1. 生成 Challenge」
+  - 「2. 發送 Challenge」
+  - 「3. 驗證最新回應」
 
 ---
 
@@ -57,7 +62,11 @@ python node.py
 **A:** 檢查網路連線，確認 `broker.emqx.io` 可用
 
 ### Q: 收不到 Response？
-**A:** 確保 `node.py` 正在運行，檢查終端是否有錯誤訊息
+**A:** 依序確認：
+1. `node.py` 正在執行
+2. `mqtt_bridge.py` 正在執行
+3. Streamlit 頁面中的 Bridge 狀態顯示正常
+4. 發送 Challenge 後等待 3-5 秒再檢查
 
 ### Q: 想用本地 Broker？
 **A:** 編輯 `app.py` 和 `node.py` 中的：

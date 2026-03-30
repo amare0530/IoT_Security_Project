@@ -219,6 +219,12 @@ python node.py
 ```
 看到「等待伺服器發送挑戰」即連線成功
 
+**終端機 3 - 啟動 MQTT Bridge**
+```bash
+python mqtt_bridge.py
+```
+看到「MQTT 背景監聽已啟動」與 Broker 連線成功訊息即表示可開始測試
+
 ---
 
 ## 📖 完整操作流程
@@ -411,6 +417,7 @@ FRR (%)
 ```
 IoT_Security_Project/
 ├── app.py                    ⭐ 伺服器主程式（Streamlit 網頁應用）
+├── mqtt_bridge.py            ⭐ Bridge：檔案 IPC 與 MQTT 中繼
 ├── node.py                   ⭐ IoT 節點設備程式
 ├── vrf_run.py                📝 VRF 獨立驗證模組
 ├── config.py                 ⚙️  系統全局配置
@@ -427,7 +434,8 @@ IoT_Security_Project/
 #### `app.py` - 伺服器端主程式 [≈600 行]
 **職責**：
 - VRF 挑戰碼生成 (基於 HMAC-SHA256)
-- MQTT 伺服器端發布/訂閱邏輯
+- 寫入 Challenge 指令至 IPC 檔案
+- 輪詢 Response 檔案並驗證結果
 - 漢明距離計算與認證判定
 - 100 次批量實驗統計
 - Streamlit 網頁介面呈現
@@ -436,16 +444,23 @@ IoT_Security_Project/
 - `calculate_hamming_distance()` - 計算兩 Hex 字串的漢明距離
 - `inject_noise()` - 模擬 PUF 雜訊注入
 - `generate_vrf_challenge()` - VRF Challenge 生成
-- `start_mqtt_listener()` - 背景執行緒監聽 MQTT 訊息
+- `send_challenge_to_bridge()` - 將 Challenge 寫入 Bridge 指令檔
+- `wait_for_latest_response()` - 限時輪詢等待最新 Response
 
 **依賴套件**：
 ```python
 import streamlit as st
-import paho.mqtt.client as mqtt
 import hashlib, hmac, random
 import pandas as pd
-import threading, time, json
+import time, json, sqlite3
 ```
+
+#### `mqtt_bridge.py` - MQTT 中繼服務 [≈200 行]
+**職責**：
+- 讀取 `challenge_out.json` 並發送至 `fujen/iot/challenge`
+- 訂閱 `fujen/iot/response` 並寫入 `response_in.json`
+- 寫入 `bridge_status.json` 心跳，供 UI 判斷 Bridge 健康度
+- 自動重試連線與斷線恢復
 
 #### `node.py` - IoT 節點設備 [≈200 行]
 **職責**：
@@ -562,7 +577,7 @@ C = HMAC-SHA256(SK, Seed)
 
 步驟 2: Challenge 透過不安全通道發往 Node
 
-步驟 3: 伺服器后續驗證時
+步驟 3: 伺服器後續驗證時
   預期 Proof = SHA256(C || SK)[0:20]
   接收 Proof (從 Response 回傳)
   

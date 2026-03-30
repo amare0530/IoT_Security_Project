@@ -1,7 +1,7 @@
 """
 ═══════════════════════════════════════════════════════════════════
 IoT 硬體指紋認證系統 - Streamlit 伺服器端 (Server)
-增強版本 - 集成 SQLite 數據庫 & 完善異常處理
+增強版本 - 整合 SQLite 資料庫與完善異常處理
 ═══════════════════════════════════════════════════════════════════
 
 系統架構：
@@ -36,6 +36,7 @@ import sqlite3
 from datetime import datetime
 import os
 import traceback
+from ui_theme import inject_theme, render_status_badge
 
 # ═══════════════════════════════════════════════════════════════
 # 【頁面配置】
@@ -303,10 +304,11 @@ if "bridge_status" not in st.session_state:
 # File-based IPC (與 mqtt_bridge.py 通信)
 # ==========================================
 
-import os, json, time
-
 OUT_FILE = "response_in.json"
 IN_FILE = "challenge_out.json"
+HEARTBEAT_FILE = "bridge_status.json"
+RESPONSE_WAIT_TIMEOUT = 15
+RESPONSE_POLL_INTERVAL = 0.5
 
 def get_latest_response():
     try:
@@ -338,319 +340,344 @@ def send_challenge_to_bridge(challenge, noise_level=3):
             }, f, indent=2)
         return True
     except Exception as e:
-        import streamlit as st
         st.error(f"發送 Challenge 失敗: {e}")
         return False
 
+def get_bridge_status():
+    """讀取 Bridge 心跳檔，回傳 (is_healthy, status_message, age_seconds)。"""
+    if not os.path.exists(HEARTBEAT_FILE):
+        return False, "尚未偵測到 Bridge，請先啟動 `python mqtt_bridge.py`", None
 
-st.title("🔒 IoT 設備硬體指紋認證系統")
-st.subheader("基於 VRF + PUF + Hamming Distance 的安全驗證平台")
+    try:
+        with open(HEARTBEAT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
 
-# ═══════════════════════════════════════════════════════════════
-# 【MQTT 實時診斷面板】
-# ═══════════════════════════════════════════════════════════════
+        last_seen = float(data.get("last_seen", 0))
+        connected = bool(data.get("connected", False))
+        age = time.time() - last_seen if last_seen else None
 
-with st.expander("Bridge 連線狀態與測試", expanded=True):
-    col_d1, col_d2, col_d3 = st.columns(3)
+        if age is None or age > 5:
+            return False, "Bridge 心跳逾時，請檢查 Bridge 視窗是否仍在執行", age
 
-    with col_d1:
-        st.markdown("**Bridge 狀態**")
-        st.success("✅ IPC 模式已啟用")
+        if not connected:
+            return False, "Bridge 已啟動，但尚未連上 MQTT Broker", age
 
-    with col_d2:
-        st.markdown("**最後 Response**")
-        latest_resp, last_time = get_latest_response()
-        if latest_resp is not None and last_time is not None:
-            time_ago = time.time() - last_time
-            st.success(f"約 {time_ago:.1f} 秒前")
+        return True, "Bridge 與 MQTT 連線正常", age
+    except Exception as e:
+        return False, f"Bridge 狀態檔讀取失敗: {e}", None
+
+def wait_for_latest_response(timeout_seconds=RESPONSE_WAIT_TIMEOUT, poll_interval=RESPONSE_POLL_INTERVAL):
+    """在限定時間內輪詢 Response 檔案，避免單次讀取造成誤判。"""
+    sent_time = st.session_state.get("challenge_sent_time", time.time())
+    deadline = time.time() + timeout_seconds
+
+    while time.time() < deadline:
+        latest_response, last_update_time = get_latest_response()
+        if latest_response is not None and last_update_time is not None and last_update_time >= sent_time:
+            return latest_response, last_update_time
+        time.sleep(poll_interval)
+
+    return None, None
+
+
+def get_auth_count():
+    """取得認證歷史總筆數。"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM auth_history")
+        total = cursor.fetchone()[0]
+        conn.close()
+        return total
+    except Exception:
+        return 0
+
+
+def verify_response_payload(challenge, response_data, threshold=5, persist=True):
+    """驗證 response payload，必要時寫入資料庫並回傳結果字典。"""
+    response = response_data.get("response") if isinstance(response_data, dict) else None
+    device_id = response_data.get("device_id", "Unknown") if isinstance(response_data, dict) else "Unknown"
+
+    if not response:
+        return None
+
+    hd = calculate_hamming_distance(challenge, response)
+    if hd is None:
+        return None
+
+    result = "pass" if hd <= threshold else "fail"
+
+    if persist:
+        save_auth_result(
+            device_id=device_id,
+            challenge=challenge,
+            response=response,
+            hamming_distance=hd,
+            threshold=threshold,
+            result=result,
+            noise_level=response_data.get("noise_level") if isinstance(response_data, dict) else None,
+        )
+
+    return {
+        "device_id": device_id,
+        "hamming_distance": hd,
+        "threshold": threshold,
+        "result": result,
+        "response": response,
+    }
+
+
+if "current_proof" not in st.session_state:
+    st.session_state.current_proof = None
+if "challenge_sent_time" not in st.session_state:
+    st.session_state.challenge_sent_time = None
+if "last_verify_result" not in st.session_state:
+    st.session_state.last_verify_result = None
+if "last_verified_received_time" not in st.session_state:
+    st.session_state.last_verified_received_time = None
+
+
+inject_theme()
+
+st.markdown(
+    """
+<div class="hero-panel">
+  <h1 class="hero-title">IoT 設備硬體指紋認證系統</h1>
+  <p class="hero-subtitle">更簡潔的操作流程：一鍵驗證、即時狀態、進階工具分區管理</p>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+bridge_ok, bridge_msg, bridge_age = get_bridge_status()
+latest_resp, latest_resp_time = get_latest_response()
+latest_resp_age = (time.time() - latest_resp_time) if latest_resp_time else None
+history_count = get_auth_count()
+
+status_cols = st.columns(4)
+with status_cols[0]:
+    st.markdown(
+        render_status_badge(
+            "Bridge 狀態",
+            "正常" if bridge_ok else "異常",
+            bridge_ok,
+            bridge_msg,
+        ),
+        unsafe_allow_html=True,
+    )
+
+with status_cols[1]:
+    st.markdown(
+        render_status_badge(
+            "最新 Response",
+            "已收到" if latest_resp is not None else "尚未收到",
+            latest_resp is not None,
+            f"約 {latest_resp_age:.1f} 秒前" if latest_resp_age is not None else "等待中",
+        ),
+        unsafe_allow_html=True,
+    )
+
+with status_cols[2]:
+    st.markdown(
+        render_status_badge(
+            "認證歷史",
+            f"{history_count} 筆",
+            history_count > 0,
+            "已保存於 SQLite",
+        ),
+        unsafe_allow_html=True,
+    )
+
+last_result = st.session_state.last_verify_result
+with status_cols[3]:
+    st.markdown(
+        render_status_badge(
+            "最近驗證",
+            "通過" if last_result and last_result.get("result") == "pass" else ("失敗" if last_result else "尚未驗證"),
+            bool(last_result and last_result.get("result") == "pass"),
+            f"HD={last_result['hamming_distance']}" if last_result else "等待操作",
+        ),
+        unsafe_allow_html=True,
+    )
+
+with st.sidebar:
+    st.header("控制面板")
+    sk = st.text_input(
+        "伺服器私鑰",
+        value="FU_JEN_CSIE_SECRET_2026",
+        type="password",
+        help="用於生成 VRF Challenge",
+    )
+    seed_input = st.text_input(
+        "CRP 種子",
+        value="CRP_INDEX_001",
+        help="相同種子會得到相同 Challenge",
+    )
+    send_noise_level = st.slider("發送雜訊等級", 0, 20, 3)
+    verify_threshold = st.slider("驗證門檻", 1, 32, 5)
+
+    st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
+    if st.button("清空 Response 快取", use_container_width=True):
+        clear_response()
+        st.success("已清空 response_in.json")
+    if st.button("刷新 UI", use_container_width=True):
+        st.rerun()
+
+
+def update_verification_state(verify_result, received_time):
+    st.session_state.last_verify_result = verify_result
+    st.session_state.last_verified_received_time = received_time
+
+
+def verify_latest_response(threshold):
+    if not st.session_state.current_challenge:
+        st.error("❌ 尚未生成 Challenge")
+        return
+
+    with st.spinner("⏳ 等待 Node 回應中..."):
+        latest_response, recv_time = wait_for_latest_response()
+
+    if latest_response is None:
+        latest_response, recv_time = get_latest_response()
+
+    if latest_response is None:
+        st.error("❌ 尚未收到 Response")
+        st.info("請確認 Node 與 Bridge 都在執行中")
+        return
+
+    if recv_time is not None and recv_time == st.session_state.last_verified_received_time:
+        st.info("ℹ️ 這筆 Response 已驗證過，未重複寫入資料庫")
+        return
+
+    verify_result = verify_response_payload(
+        challenge=st.session_state.current_challenge,
+        response_data=latest_response,
+        threshold=threshold,
+        persist=True,
+    )
+    if verify_result:
+        update_verification_state(verify_result, recv_time)
+
+
+action_cols = st.columns(4)
+with action_cols[0]:
+    run_one_click = st.button("🚀 一鍵驗證", use_container_width=True, type="primary")
+with action_cols[1]:
+    run_generate = st.button("1. 生成 Challenge", use_container_width=True)
+with action_cols[2]:
+    run_send = st.button("2. 發送 Challenge", use_container_width=True)
+with action_cols[3]:
+    run_check = st.button("3. 驗證最新回應", use_container_width=True)
+
+if run_generate:
+    challenge, proof = generate_vrf_challenge(sk, seed_input)
+    if challenge:
+        st.session_state.current_challenge = challenge
+        st.session_state.current_proof = proof
+        st.success("✅ Challenge 已生成")
+
+if run_send:
+    if not st.session_state.current_challenge:
+        st.error("❌ 請先生成 Challenge")
+    else:
+        clear_response()
+        sent_ok = send_challenge_to_bridge(st.session_state.current_challenge, send_noise_level)
+        if sent_ok:
+            st.session_state.challenge_sent_time = time.time()
+            st.success("✅ Challenge 已發送")
         else:
-            st.warning("尚未收到")
+            st.error("❌ 發送失敗")
 
-    with col_d3:
-        st.markdown("**手動操作**")
-        if st.button("刷新 UI", key="refresh_ui", use_container_width=True): 
-            st.rerun()
+if run_check:
+    verify_latest_response(verify_threshold)
 
-    st.divider()
-
-    col_test1, col_test2 = st.columns(2)
-
-    with col_test1:
-        st.markdown("### 發送測試訊息")
-        if st.button("發送 Response 測試", key="mqtt_test_send", use_container_width=True):
-            try:
-                test_response = {
-                    "device_id": "TEST_DEVICE",
-                    "response": "a1b2c3d4e5f6" * 10 + "a1b2c3d4e5f6",
-                    "timestamp": time.time(),
-                    "noise_level": 3,
-                    "status": "test"
-                }
-
-                # 把模擬回應直接寫入檔案
-                with open(OUT_FILE, "w", encoding="utf-8") as f:
-                    json.dump({"response": test_response, "received_time": time.time()}, f, ensure_ascii=False)
-                
-                st.success("✅ 測試訊息已儲存 (模擬)")
-                st.info("請檢查下方是否出現 Response...")
-            except Exception as e:
-                st.error(f"❌ ERROR: {str(e)}")
-
-    with col_test2:
-        st.markdown("### 收到的訊息")
-        latest_resp, _ = get_latest_response()
-        if latest_resp is not None:
-            st.success("✅ 已收到")
-            st.json(latest_resp)
+if run_one_click:
+    challenge, proof = generate_vrf_challenge(sk, seed_input)
+    if challenge:
+        st.session_state.current_challenge = challenge
+        st.session_state.current_proof = proof
+        clear_response()
+        sent_ok = send_challenge_to_bridge(challenge, send_noise_level)
+        if sent_ok:
+            st.session_state.challenge_sent_time = time.time()
+            verify_latest_response(verify_threshold)
         else:
-            st.warning("⏳ 未收到任何訊息")
+            st.error("❌ 發送失敗，無法完成一鍵驗證")
 
-    st.divider()
-    latest_resp, _ = get_latest_response()
+st.divider()
+
+latest_resp, latest_resp_time = get_latest_response()
+
+st.subheader("最近一次驗證結果")
+latest_result = st.session_state.last_verify_result
+if latest_result:
+    r1, r2, r3, r4 = st.columns(4)
+    with r1:
+        st.metric("結果", "✅ 通過" if latest_result["result"] == "pass" else "❌ 失敗")
+    with r2:
+        st.metric("漢明距離", f"{latest_result['hamming_distance']} bits")
+    with r3:
+        st.metric("門檻", f"{latest_result['threshold']} bits")
+    with r4:
+        st.metric("設備 ID", latest_result["device_id"])
+
+    if latest_result["result"] == "pass":
+        st.success("認證成功：設備特徵符合預期")
+    else:
+        st.error("認證失敗：距離超過門檻")
+else:
+    st.info("尚未有驗證結果，請先使用一鍵驗證或步驟操作")
+
+info_left, info_right = st.columns(2)
+with info_left:
+    st.markdown("### 當前 Challenge")
+    if st.session_state.current_challenge:
+        st.code(st.session_state.current_challenge, language="text")
+        if st.session_state.current_proof:
+            st.caption(f"Proof: {st.session_state.current_proof}")
+    else:
+        st.info("尚未生成 Challenge")
+
+with info_right:
+    st.markdown("### 最新 Response")
     if latest_resp is not None:
-        st.markdown("### 收到的 Response:")
         st.json(latest_resp)
     else:
-        st.info("等待 Response...")
-st.divider()
-    
-# 顯示詳細 Response 內容
-latest_resp, _ = get_latest_response()
-if latest_resp is not None:
-    st.markdown("### 📊 收到的 Response:")
-    st.json(latest_resp)
-else:
-    st.info("⏳ 等待 Response...")
-    st.code("# 步驟: \n1. 點擊「生成新挑戰碼」\n2. 點擊「📤 發送至 Node 端」\n3. 等待 3-5 秒\n4. 點擊「🔍 檢查並驗證」", language="python")
+        st.info("尚未收到 Response")
 
-st.divider()
+with st.expander("進階工具：手動輸入驗證（選用）", expanded=False):
+    manual_response = st.text_input("Response (Hex)", key="manual_response_hex")
+    if manual_response and st.session_state.current_challenge:
+        hd = calculate_hamming_distance(st.session_state.current_challenge, manual_response)
+        if hd is not None:
+            st.metric("手動驗證漢明距離", f"{hd} bits")
 
-# 創建分頁
-tab1, tab2, tab3, tab4 = st.tabs(["🔐 認證系統", "📊 歷史記錄", "📈 實驗統計", "⚙️ 系統狀態"])
+tab_batch, tab_history, tab_monitor = st.tabs(["🛡️ 批量實驗", "📊 歷史記錄", "⚙️ 系統監控"])
 
-# ═══════════════════════════════════════════════════════════════
-# 【Tab 1: 認證系統】
-# ═══════════════════════════════════════════════════════════════
-
-with tab1:
-    st.info(
-        "📋 **系統流程說明**\n\n"
-        "1️⃣ Challenge 生成：伺服器用 VRF 產生隨機挑戰碼\n"
-        "2️⃣ MQTT 傳輸：挑戰碼透過 MQTT 發送到 Node 設備\n"
-        "3️⃣ PUF 模擬：Node 設備模擬 PUF 特徵提取，注入雜訊\n"
-        "4️⃣ Response 回傳：Node 透過 MQTT 回傳包含雜訊的響應\n"
-        "5️⃣ 漢明距離驗證：伺服器計算距離，判定設備是否合法"
-    )
-    
-    col_info, col_control = st.columns([1, 1])
-    
-    with col_control:
-        st.subheader("⚙️ 系統設定")
-        sk = st.text_input(
-            "🔐 伺服器私鑰 (Server Secret Key)",
-            value="FU_JEN_CSIE_SECRET_2026",
-            type="password",
-            help="僅伺服器持有，用於生成不可預測的 VRF Challenge"
-        )
-        seed_input = st.text_input(
-            "🎲 CRP 抽考種子 (Challenge Seed)",
-            value="CRP_INDEX_001",
-            help="從 CRP 資料庫中選取的種子編號"
-        )
-    
-    st.divider()
-    
-    # Phase 1: Challenge 生成與發送
-    st.subheader("📤 第一階段：Challenge 生成與發送")
-    
-    col_gen, col_send = st.columns([1, 1])
-    
-    with col_gen:
-        if st.button("🔄 生成新挑戰碼", key="gen_challenge"):
-            try:
-                c_code, proof_val = generate_vrf_challenge(sk, seed_input)
-                if c_code:
-                    st.session_state.current_challenge = c_code
-                    st.success(f"✅ Challenge 已生成")
-                    st.code(f"{c_code}", language="hex")
-                    st.caption(f"Proof: {proof_val}")
-            except Exception as e:
-                st.error(f"❌ 生成失敗: {str(e)}")
-    
-    with col_send:
-        if st.button("📡 發送至 Node 端", key="send_challenge"):
-            if not st.session_state.current_challenge:
-                st.error("請先生成 Challenge")
-            else:
-                try:
-                    success = send_challenge_to_bridge(st.session_state.current_challenge, 3)
-
-                    if success:
-                        clear_response()
-                        st.session_state.challenge_sent_time = time.time()      
-                        st.success("✅ Challenge 已發送至 Bridge")
-                    else:
-                        st.error("❌ 發送失敗")
-                except Exception as e:
-                    st.error(f"❌ 發送失敗: {str(e)}")
-                    print(f"[ERROR] 發送 Challenge 異常: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
-    
-    st.divider()
-    
-    # Phase 2 & 3: 接收與驗證
-    st.subheader("📥 第二/三階段：接收 Response 與驗證")
-    
-    col_check, col_manual = st.columns([1, 1])
-    
-    with col_check:
-        if st.button("🔍 檢查並驗證", key="check_response"):
-            if not st.session_state.current_challenge:
-                st.error("❌ 請先生成 Challenge")
-                print("[DEBUG] No current_challenge in session_state")
-            else:
-                # 從全局狀態讀取最新 Response
-                latest_response, last_update_time = get_latest_response()
-                print(f"[DEBUG] 檢查驗證 - 全局 Response: {latest_response is not None}, 時間: {last_update_time}")
-                
-                if latest_response is None:
-                    # 显示详细的诊断信息
-                    st.error("❌ 尚未收到 Response")
-                    
-                    # 诊断信息
-                    with st.expander("🔧 診斷信息", expanded=True):
-                        col_d1, col_d2 = st.columns(2)
-                        
-                        with col_d1:
-                            st.markdown("**MQTT 連接狀態**")
-                            st.info("ℹ️ 使用全局MQTT客戶端 (持久化)")
-                        
-                        with col_d2:
-                            st.markdown("**等待時間**")
-                            # 顯示 Challenge 發送時以來已等待多久
-                            if 'challenge_sent_time' in st.session_state:
-                                wait_time = time.time() - st.session_state.challenge_sent_time
-                                st.warning(f"⏳ 等待中... {wait_time:.1f}秒")
-                            else:
-                                st.warning("尚未發送 Challenge")
-                        
-                        st.markdown("**可能的原因與排除步驟：**")
-                        st.markdown("""
-                        1. ❌ **Node 設備未運行**
-                           → 執行: `python node.py`
-                        
-                        2. ❌ **Challenge 未成功發送**
-                           → 檢查「📤 發送至 Node 端」是否顯示 ✅ 成功
-                           → 如未成功，重新點擊發送
-                        
-                        3. ❌ **Node 處理超時**
-                           → 等待 10-15 秒再試
-                           → 查看 Node 終端是否有日誌
-                        
-                        4. ❌ **Server 未訂閱 Response 主題**
-                           → 重新啟動 Streamlit: `streamlit run app.py`
-                        
-                        **快速診斷：**
-                        ```bash
-                        python mqtt_test.py
-                        ```
-                        """)
-                    
-                    print(f"[DEBUG] Global Response is None. Latest time: {last_update_time}")
-                
-                else:
-                    try:
-                        print(f"\n[DEBUG] ✅ 收到 Response！開始驗證")
-                        print(f"   Device ID: {latest_response.get('device_id')}")
-                        print(f"   Response: {str(latest_response.get('response'))[:40]}...")
-                        
-                        response_data = latest_response
-                        response = response_data.get('response')
-                        device_id = response_data.get('device_id', 'Unknown')
-                        
-                        if response:
-                            hd = calculate_hamming_distance(st.session_state.current_challenge, response)
-                            threshold = 5
-                            
-                            if hd is not None:
-                                result = "pass" if hd <= threshold else "fail"
-                                
-                                # 保存到資料庫
-                                save_auth_result(
-                                    device_id=device_id,
-                                    challenge=st.session_state.current_challenge,
-                                    response=response,
-                                    hamming_distance=hd,
-                                    threshold=threshold,
-                                    result=result,
-                                    noise_level=response_data.get('noise_level')
-                                )
-                                
-                                col_r1, col_r2 = st.columns(2)
-                                with col_r1:
-                                    st.metric("漢明距離", f"{hd} bits")
-                                with col_r2:
-                                    st.metric("容錯門檻", f"{threshold} bits")
-                                
-                                if result == "pass":
-                                    st.success(f"✅ 認證通過")
-                                else:
-                                    st.error(f"❌ 認證失敗")
-                        else:
-                            st.error("❌ Response 格式無效")
-                    except Exception as e:
-                        st.error(f"❌ 驗證失敗: {str(e)}")
-                        import traceback
-                        traceback.print_exc()
-    
-    with col_manual:
-        st.write("### 手動輸入驗證")
-        manual_response = st.text_input("Response (Hex)")
-        if manual_response and st.session_state.current_challenge:
-            try:
-                hd = calculate_hamming_distance(st.session_state.current_challenge, manual_response)
-                threshold = 5
-                if hd is not None:
-                    st.metric("漢明距離", f"{hd} bits")
-            except Exception as e:
-                st.error(f"❌ {str(e)}")
-    
-    st.divider()
-    
-    # Phase 4: 批量實驗
-    st.subheader("🛡️ 第四階段：容錯能力測試")
-    
+with tab_batch:
+    st.subheader("容錯能力測試（100 次）")
     if st.session_state.current_challenge:
-        col_noise, col_thresh = st.columns(2)
-        with col_noise:
-            exp_noise = st.slider("實驗雜訊等級", 0, 20, 3)
-        with col_thresh:
-            exp_threshold = st.number_input("實驗容錯門檻", 0, 256, 5)
-        
-        if st.button("🚀 執行 100 次實驗"):
+        c1, c2 = st.columns(2)
+        with c1:
+            exp_noise = st.slider("實驗雜訊等級", 0, 20, 3, key="batch_noise")
+        with c2:
+            exp_threshold = st.number_input("實驗容錯門檻", 0, 256, 5, key="batch_threshold")
+
+        if st.button("🚀 執行 100 次實驗", key="run_batch"):
             batch_id = f"batch_{int(time.time() * 1000)}"
-            
             progress_bar = st.progress(0)
             results = []
-            
+
             try:
                 for i in range(100):
-                    # 注入雜訊
                     noisy_response = inject_noise(st.session_state.current_challenge, exp_noise)
                     if noisy_response is None:
                         continue
-                    
-                    # 計算距離
+
                     hd = calculate_hamming_distance(st.session_state.current_challenge, noisy_response)
                     if hd is not None:
                         result = "pass" if hd <= exp_threshold else "fail"
-                        results.append({
-                            'hd': hd,
-                            'result': result
-                        })
-                        
-                        # 保存到資料庫
+                        results.append({"hd": hd, "result": result})
                         save_auth_result(
                             device_id="FU_JEN_NODE_01",
                             challenge=st.session_state.current_challenge,
@@ -659,129 +686,106 @@ with tab1:
                             threshold=exp_threshold,
                             result=result,
                             noise_level=exp_noise,
-                            batch_id=batch_id
+                            batch_id=batch_id,
                         )
-                    
+
                     progress_bar.progress((i + 1) / 100)
-                
-                # 統計結果
+
                 if results:
-                    passed = sum(1 for r in results if r['result'] == 'pass')
+                    passed = sum(1 for item in results if item["result"] == "pass")
                     failed = len(results) - passed
-                    frr = (failed / len(results) * 100) if len(results) > 0 else 0
-                    avg_hd = sum(r['hd'] for r in results) / len(results)
-                    
-                    # 保存批量實驗統計
+                    frr = (failed / len(results) * 100) if results else 0
+                    avg_hd = sum(item["hd"] for item in results) / len(results)
                     save_batch_experiment(batch_id, exp_noise, exp_threshold, len(results), passed, failed, frr, avg_hd)
-                    
-                    col_s1, col_s2, col_s3 = st.columns(3)
-                    with col_s1:
-                        st.metric("通過", f"{passed}", "✅")
-                    with col_s2:
-                        st.metric("失敗", f"{failed}", "❌")
-                    with col_s3:
-                        st.metric("FRR", f"{frr:.1f}%", "⚠️")
-                    
-                    st.success(f"✅ 實驗完成！(Batch ID: {batch_id})")
+
+                    s1, s2, s3 = st.columns(3)
+                    with s1:
+                        st.metric("通過", f"{passed}")
+                    with s2:
+                        st.metric("失敗", f"{failed}")
+                    with s3:
+                        st.metric("FRR", f"{frr:.1f}%")
+
+                    st.success(f"✅ 實驗完成（Batch ID: {batch_id}）")
             except Exception as e:
                 st.error(f"❌ 實驗執行失敗: {str(e)}\n{traceback.format_exc()}")
     else:
-        st.warning("⏳ 請先生成 Challenge")
+        st.warning("請先生成 Challenge 再執行批量實驗")
 
-# ═══════════════════════════════════════════════════════════════
-# 【Tab 2: 歷史記錄】
-# ═══════════════════════════════════════════════════════════════
+with tab_history:
+    st.subheader("認證歷史記錄")
+    f1, f2, f3 = st.columns(3)
+    with f1:
+        limit = st.number_input("顯示筆數", 10, 1000, 100, key="history_limit")
+    with f2:
+        filter_device = st.selectbox("篩選設備", ["全部", "FU_JEN_NODE_01"], key="history_device")
+    with f3:
+        filter_result = st.selectbox("篩選結果", ["全部", "pass", "fail"], key="history_result")
 
-with tab2:
-    st.subheader("📋 認證歷史記錄")
-    
-    col_f1, col_f2, col_f3 = st.columns(3)
-    with col_f1:
-        limit = st.number_input("顯示筆數", 10, 1000, 100)
-    with col_f2:
-        filter_device = st.selectbox("筛選設備", ["全部", "FU_JEN_NODE_01"])
-    with col_f3:
-        filter_result = st.selectbox("篩選結果", ["全部", "pass", "fail"])
-    
-    # 取得記錄
     df = get_auth_history(limit=limit)
-    
     if not df.empty:
-        # 應用篩選
         if filter_device != "全部":
-            df = df[df['device_id'] == filter_device]
+            df = df[df["device_id"] == filter_device]
         if filter_result != "全部":
-            df = df[df['result'] == filter_result]
-        
+            df = df[df["result"] == filter_result]
+
         st.dataframe(df, use_container_width=True)
-        
-        # 下載 CSV
         csv_data = df.to_csv(index=False)
         st.download_button(
-            label="📥 下載為 CSV",
+            label="📥 下載 CSV",
             data=csv_data,
             file_name=f"auth_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
+            mime="text/csv",
         )
     else:
-        st.info("📭 暫無認證歷史記錄")
+        st.info("暫無認證歷史記錄")
 
-# ═══════════════════════════════════════════════════════════════
-# 【Tab 3: 實驗統計】
-# ═══════════════════════════════════════════════════════════════
-
-with tab3:
-    st.subheader("📈 批量實驗統計")
-    
-    batch_df = get_all_batch_experiments(limit=50)
-    
-    if not batch_df.empty:
-        # 顯示統計表格
-        st.dataframe(batch_df, use_container_width=True)
-        
-        # 統計圖表
-        col_chart1, col_chart2 = st.columns(2)
-        
-        with col_chart1:
-            st.bar_chart(batch_df[['batch_id', 'frr']].set_index('batch_id'))
-        
-        with col_chart2:
-            st.line_chart(batch_df[['timestamp', 'avg_distance']].set_index('timestamp'))
-    else:
-        st.info("📭 暫無批量實驗記錄")
-
-# ═══════════════════════════════════════════════════════════════
-# 【Tab 4: 系統狀態】
-# ═══════════════════════════════════════════════════════════════
-
-with tab4:
-    st.subheader("⚙️ 系統監控")
-    
-    col_status1, col_status2, col_status3 = st.columns(3)
-    
-    with col_status1:
-        st.metric("Bridge 狀態", "🟢 IPC 啟用中")
-    
-    with col_status2:
+with tab_monitor:
+    st.subheader("系統監控與診斷")
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("Bridge", "正常" if bridge_ok else "異常")
+    with m2:
         db_size = os.path.getsize(DB_PATH) / 1024 if os.path.exists(DB_PATH) else 0
-        st.metric("數據庫大小", f"{db_size:.1f} KB")
-    
-    with col_status3:
-        hist_count = len(get_auth_history(limit=100000))
-        st.metric("認證記錄數", f"{hist_count}")
-    
-    pass
-    pass
-    
-    st.divider()
-    st.write("**📊 系統資訊**")
-    st.code(f"""
-MQTT Broker: broker.emqx.io:1883
+        st.metric("資料庫大小", f"{db_size:.1f} KB")
+    with m3:
+        st.metric("認證記錄數", f"{history_count}")
+
+    hb_exists = os.path.exists(HEARTBEAT_FILE)
+    if hb_exists:
+        try:
+            with open(HEARTBEAT_FILE, "r", encoding="utf-8") as f:
+                heartbeat = json.load(f)
+            st.caption("Bridge 心跳狀態")
+            st.json(heartbeat)
+        except Exception as e:
+            st.error(f"讀取心跳檔失敗: {e}")
+    else:
+        st.warning("尚未找到 bridge_status.json")
+
+    diag_col1, diag_col2 = st.columns(2)
+    with diag_col1:
+        if st.button("寫入模擬 Response", key="monitor_mock_response", use_container_width=True):
+            mock_response = {
+                "device_id": "TEST_DEVICE",
+                "response": "a1b2c3d4e5f6" * 10 + "a1b2c3d4e5f6",
+                "timestamp": time.time(),
+                "noise_level": 3,
+                "status": "test",
+            }
+            with open(OUT_FILE, "w", encoding="utf-8") as f:
+                json.dump({"response": mock_response, "received_time": time.time()}, f, ensure_ascii=False, indent=2)
+            st.success("已寫入模擬 Response")
+    with diag_col2:
+        st.code(
+            """
+Broker: broker.emqx.io:1883
 Challenge Topic: fujen/iot/challenge
 Response Topic: fujen/iot/response
-Database: {DB_PATH}
-Python Version: 3.8+
-    """)
+IPC Files: challenge_out.json / response_in.json / bridge_status.json
+""".strip(),
+            language="text",
+        )
 
-st.divider()
-st.markdown("---\n*IoT 硬體指紋認證系統 v2.0 (Enhanced)*\n*最後更新: 2026-03-29*")
+st.markdown("---")
+st.caption("IoT 硬體指紋認證系統 - 簡化介面版")

@@ -1,342 +1,106 @@
-## 🔧 MQTT Response 接收问题 - 修复说明
+## 🔧 MQTT 無回應修復指南（Bridge 架構）
 
-### 📋 问题诊断
+本專案目前採用三程序架構：
+1. Streamlit 伺服器：app.py
+2. Node 設備：node.py
+3. MQTT Bridge：mqtt_bridge.py
 
-您遇到的 **"尚未收到 Response"** 错误由以下根本原因导致：
-
-#### **关键问题 1：缺失 @st.cache_resource 装饰器**
-- **问题**：MQTT 客户端在每次 Streamlit 重新运行时都被销毁和重新创建
-- **后果**：监听线程中断，session state 与实际连接不同步
-- **表现**：虽然显示 "已连接"，但实际上接收到的消息无法被存储到 session state
-
-#### **关键问题 2：使用 loop_forever() 导致的线程管理混乱**
-- **问题**：`client.loop_forever()` 是阻塞调用，在后台线程中可能导致多个客户端竞争
-- **后果**：消息可能被旧的/被销毁的客户端接收
-- **解决**：改用 `client.loop_start()`（非阻塞）
-
-#### **关键问题 3：条件订阅逻辑错误**
-- **问题**：即使连接失败，代码仍然执行订阅：
-```python
-if rc == 0:
-    st.session_state.mqtt_status = "已連接"
-    client.subscribe("fujen/iot/response")
-else:
-    st.session_state.mqtt_status = f"連接失敗"
-    client.subscribe("fujen/iot/response")  # ❌ 这里是错误！
-```
-- **后果**：订阅失败但代码继续运行
-
-#### **关键问题 4：Challenge 发送/接收时序不匹配**
-- **问题**：发送 Challenge 用临时客户端，接收用后台客户端，两者可能不同步
-- **解决**：使用同一全局 mqtt_client 对象
+若只啟動 app.py 與 node.py，Bridge 未啟動時會出現「測試可過、實際沒反應」的情況。
 
 ---
 
-### ✅ 已应用的修复
+## ✅ 已修復項目
 
-#### **修复 1：添加 @st.cache_resource 装饰器**
+### 1. Bridge 連線穩定性
+- 新增連線失敗重試機制（固定間隔重試）。
+- 新增斷線狀態回報與重連流程。
+- 保留 QoS=1，降低訊息遺失機率。
 
-```python
-@st.cache_resource
-def get_mqtt_client():
-    """創建並持久化 MQTT 客戶端（Streamlit 不會銷毀它）"""
-    client = mqtt.Client(client_id=..., clean_session=False)
-    # ... 配置回调
-    client.connect(...)
-    client.loop_start()  # ✅ 使用非阻塞模式
-    return client
+### 2. Bridge 心跳監控
+- 新增 bridge_status.json 心跳檔。
+- app.py 可即時顯示 Bridge 是否存活、是否已連上 Broker。
 
-mqtt_client = get_mqtt_client()  # 全局持久化客户端
-```
+### 3. app.py 回應等待機制
+- 將單次檢查改為限時輪詢（預設 15 秒）。
+- 避免因非同步時序造成「提早判定失敗」。
 
-**效果**：
-- ✅ MQTT 客户端在整个会话期间保持活跃
-- ✅ Session state 和实际连接状态同步
-- ✅ 多次 Streamlit 重新运行不会断开连接
-
----
-
-#### **修復 2：改用 loop_start() 非阻塞模式**
-
-```python
-client.loop_start()  # ✅ 不阻塞，能正常处理事件
-# 而非
-client.loop_forever()  # ❌ 阻塞，导致线程问题
-```
-
-**效果**：
-- ✅ MQTT 事件循环独立运行
-- ✅ 消息接收和处理更可靠
-- ✅ 适配 Streamlit 的重新运行机制
+### 4. 診斷訊息強化
+- 顯示未收到 Response 的分流原因：
+  - Node 未執行
+  - Bridge 未啟動或中斷
+  - 回應超時
 
 ---
 
-#### **修復 3：修正订阅逻辑**
+## 🚀 正確啟動順序
 
-```python
-def mqtt_on_connect(client, userdata, flags, rc):
-    if rc == 0:
-        print("[INFO] MQTT 已連接至 Broker")
-        st.session_state.mqtt_status = "✅ 已連接"
-        client.subscribe("fujen/iot/response", qos=1)  # ✅ 只在连接成功时订阅
-    else:
-        error_msg = f"連接失敗 (代碼: {rc})"
-        st.session_state.mqtt_status = f"❌ {error_msg}"
-        # ❌ 不在这里执行 subscribe
-```
+請開三個終端機：
 
----
-
-#### **修復 4：统一使用全局 mqtt_client**
-
-```python
-# 发送 Challenge 时
-result = mqtt_client.publish(
-    "fujen/iot/challenge", 
-    payload,
-    qos=1  # ✅ 使用 QoS=1 保证送达
-)
-
-# 不再创建临时客户端
-# client = mqtt.Client(...)  # ❌ 删除
-```
-
----
-
-#### **修複 5：添加 MQTT 诊断面板**
-
-在主页面添加实时监控面板，可以查看：
-- ✅ 连接状态
-- ✅ 最后收到消息的时间
-- ✅ 错误信息
-- ✅ 最后收到的 Response 内容
-
----
-
-#### **修複 6：改进错误诊断和提示**
-
-当收不到 Response 时，显示详细的诊断信息：
-```
-❌ 尚未收到 Response
-
-🔧 診斷信息
-連接狀態 ✅ 已連接
-Node 狀態 ⏳ 等待中... 3.5秒
-
-可能的原因：
-1. ❌ Node 設備未運行或未連接至 Broker
-2. ❌ Node 未訂閱 'fujen/iot/challenge' 主題
-...
-
-排除步驟：
-- 確保 Node 端運行正常 (運行 `python node.py`)
-- 重新點擊「發送至 Node 端」
-- 等待 5-10 秒後再點擊「檢查並驗證」
-```
-
----
-
-### 🧪 测试修复
-
-#### **方法 1：快速诊断测试（推荐）**
-
-```bash
-python mqtt_test.py
-```
-
-这个脚本将：
-1. ✅ 连接到 MQTT Broker
-2. ✅ 发送模拟 Challenge  
-3. ✅ 等待 Response（15 秒超时）
-4. ✅ 显示详细的诊断结果
-
-**预期结果**：
-```
-✅ 測試成功！MQTT 雙向通信運作正常。
-可以放心使用 app.py 進行認證測試。
-```
-
----
-
-#### **方法 2：完整系统测试**
-
-**终端 1：启动 Node 设备**
+### 終端機 1：啟動 Node
 ```bash
 python node.py
 ```
 
-**终端 2：运行 MQTT 诊断**
+### 終端機 2：啟動 Bridge
 ```bash
-python mqtt_test.py
+python mqtt_bridge.py
 ```
 
-**终端 3：启动 Streamlit 应用**
+### 終端機 3：啟動 Streamlit
 ```bash
 streamlit run app.py
 ```
 
-然后在 UI 中：
-1. ⚡ 点击「生成新挑戰碼」
-2. 📤 点击「發送至 Node 端」（显示 ✅ Challenge 已发送至 Node 端）
-3. ⏳ 等待 3-5 秒
-4. 🔍 点击「檢查並驗證」（应该显示 Hamming 距离）
+---
+
+## 🧪 建議驗證流程
+
+1. 在 UI 點擊「生成新挑戰碼」。
+2. 點擊「發送至 Node 端」。
+3. 觀察 Bridge 終端是否顯示「已透過 MQTT 成功發送」。
+4. 等待 3 到 5 秒後點擊「檢查並驗證」。
+5. 若正常，應看到漢明距離與認證結果。
 
 ---
 
-### 🚀 使用步骤
+## 🔍 快速排查
 
-#### **第一次运行（修复后）**
+### 情境 A：UI 顯示尚未收到 Response
+請依序檢查：
+1. node.py 是否仍在執行。
+2. mqtt_bridge.py 是否仍在執行。
+3. UI 的 Bridge 狀態是否為正常。
+4. Bridge 終端是否有收到 response 主題訊息。
 
-```bash
-# 1. 确保依赖已安装
-pip install paho-mqtt streamlit pandas
+### 情境 B：Bridge 連不上 Broker
+1. 先確認網路連線。
+2. 測試 broker.emqx.io 是否可達。
+3. 如學校網路封鎖 1883，改用可用 Broker 或本機 Broker。
 
-# 2. 终端 1：启动 Node 设备
-python node.py
-
-# 3. 终端 2：启动 Streamlit 应用
-streamlit run app.py
-
-# 4. 在 UI 中执行：
-# - 生成 Challenge
-# - 发送至 Node
-# - 等等 3-5 秒
-# - 检查并验证
-
-# 预期结果：看到 Hamming 距离和认证结果 ✅ 或 ❌
-```
+### 情境 C：測試腳本可過，但 UI 仍偶發超時
+1. 確認 Challenge 發送後有等待至少 3 秒。
+2. 重新啟動三個程序，清掉舊連線狀態。
+3. 檢查 bridge_status.json 的 last_seen 是否持續更新。
 
 ---
 
-### 📊 对比修复前后
+## 📌 架構說明（目前版本）
 
-| 项目 | 修复前 | 修复后 |
-|------|-------|--------|
-| 客户端持久性 | ❌ 每次重新运行被销毁 | ✅ @st.cache_resource 保持活跃 |
-| 事件循环 | ❌ loop_forever() 阻塞 | ✅ loop_start() 非阻塞 |
-| 订阅逻辑 | ❌ 即使失败也订阅 | ✅ 只在连接成功时订阅 |
-| 消息发送 | ❌ 每次创建临时客户端 | ✅ 使用全局 mqtt_client |
-| QoS 设置 | ❌ 默认 QoS=0 可能丢失 | ✅ QoS=1 保证送达 |
-| 诊断工具 | ❌ 无 | ✅ 详细诊断面板 + mqtt_test.py |
-| Response 接收 | ❌ 几乎不工作 | ✅ 稳定可靠 |
+資料流：
+1. app.py 寫入 challenge_out.json
+2. mqtt_bridge.py 讀取 challenge_out.json 並發送 MQTT
+3. node.py 訂閱 challenge、回傳 response
+4. mqtt_bridge.py 接收 response 後寫入 response_in.json
+5. app.py 輪詢 response_in.json 並驗證
 
----
-
-### 🔍 调试技巧
-
-如果修复后仍有问题，检查以下内容：
-
-#### **查看 Console 日志**
-
-运行 Streamlit 时，查看终端输出中的 DEBUG 信息：
-
-```
-[INFO] MQTT 已連接至 Broker
-[INFO] 已訂閱 'fujen/iot/response' 主題 (QoS=1)
-[SUCCESS] Challenge 已發送: {"challenge": "abc123..."...
-[DEBUG] 收到訊息: 主題=fujen/iot/response
-[SUCCESS] 成功存儲 Response: device_id=FU_JEN_NODE_01
-```
-
-#### **检查 MQTT 诊断面板**
-
-点击 UI 中的 "📡 MQTT 連接狀態 (實時監控)" 来展开诊断面板
-
-#### **运行 MQTT 测试脚本**
-
-```bash
-python mqtt_test.py
-```
-
-如果测试脚本通过，说明您的网络和 MQTT broker 配置正常。
+這代表 Bridge 是必要程序，不可省略。
 
 ---
 
-### 🆘 如果仍然有问题
+## 🛠 後續重構建議
 
-#### **问题 1：mqtt_test.py 超时（15 秒）**
+若要完全消除檔案輪詢時序問題，可進行第二階段重構：
+1. app.py 改為直接 MQTT publish/subscribe。
+2. 將 mqtt_bridge.py 降級為相容模式或退役。
 
-**原因**：Node 设备未正确发送 Response
-
-**解决方案**：
-```bash
-# 检查 Node 是否正在运行
-# 并查看是否有错误日志
-
-# 运行 Node，查看日志
-python node.py
-```
-
-#### **问题 2：mqtt_test.py 无法连接 Broker**
-
-**原因**：网络问题或 Broker 不可用
-
-**解决方案**：
-```bash
-# 测试网络连接
-ping broker.emqx.io
-
-# 测试端口
-telnet broker.emqx.io 1883
-
-# 或者使用 mosquitto_sub 测试
-mosquitto_sub -h broker.emqx.io -t "fujen/iot/response"
-```
-
-#### **问題 3：Streamlit 中看到多个 MQTT 连接**
-
-**原因**：可能有旧进程仍在运行
-
-**解决方案**：
-```bash
-# 杀死所有 Python 进程并重新启动
-pkill python
-
-# 然后重新运行
-python node.py  # 终端 1
-streamlit run app.py  # 终端 2
-```
-
----
-
-### 📝 代码变更摘要
-
-**修改文件**：`app.py`
-
-**主要变更**：
-1. ✅ 添加 `@st.cache_resource` 装饰的 `get_mqtt_client()` 函数
-2. ✅ 改用 `client.loop_start()` 代替 `loop_forever()`
-3. ✅ 修正 `mqtt_on_connect` 条件逻辑
-4. ✅ 统一使用全局 `mqtt_client` 发送和接收
-5. ✅ 添加 QoS=1 参数确保消息送达
-6. ✅ 添加 MQTT 诊断面板
-7. ✅ 改进错误提示和诊断信息
-
-**新增文件**：`mqtt_test.py`
-
----
-
-### ✨ 预期效果
-
-修复后，您应该看到：
-
-✅ **UI 中的诊断面板**：
-- 连接状态显示「✅ 已連接」
-- 可以看到最后收到消息的时间：「⏱️ 最後收到: 2.3 秒前」
-- 显示最后收到的 Response 的完整 JSON 数据
-
-✅ **工作流程正常**：
-1. ⚡ 生成 Challenge → Success
-2. 📤 发送至 Node → 显示「✅ Challenge 已發送至 Node 端 (QoS=1)」
-3. ⏳ 等待 3-5 秒
-4. 🔍 检查并验证 → 显示 **Hamming 距离** 和认证结果
-
-✅ **诊断脚本工作正常**：
-```bash
-$ python mqtt_test.py
-✅ 測試成功！MQTT 雙向通信運作正常。
-```
-
----
-
-现在请按照上述步骤测试修复。如果有任何问题，我可以进一步调整代码。
+目前版本先以穩定可運行為優先，確保展示與實驗流程可重現。
