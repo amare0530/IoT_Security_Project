@@ -30,6 +30,7 @@
 【Phase 1】Challenge 生成與發送
     ┌──────────────────────┐
     │  VRF 確定性生成      │ 
+
     │  HMAC-SHA256 算法    │
     │  輸入：私鑰 + 種子   │
     │  輸出：Challenge C  │
