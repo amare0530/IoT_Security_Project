@@ -1,10 +1,10 @@
 {
   "response": {
     "device_id": "FU_JEN_NODE_01",
-    "response": "4e2a5891955b0a52b81571dc2697376c0d88765819a96d9602945f48e953ba65",
-    "timestamp": 1774882006.2778387,
+    "response": "0e2a5881955b2a52b81571dc2697376c0d88765819ab6d1602945fc8e953ba65",
+    "timestamp": 1774929455.6922793,
     "noise_level": 3,
     "status": "success"
   },
-  "received_time": 1774882006.5158951
+  "received_time": 1774929455.961194
 }

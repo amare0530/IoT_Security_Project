@@ -1,58 +1,41 @@
 # 🚀 快速開始指南
 
-## 一分鐘快速上手
+### 第一步：建立虛擬環境
 
-### Windows 一鍵檢查與啟動（推薦）
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps
+python -m venv .venv
 ```
 
-說明：
-- `start_all.ps1` 會自動檢測 `.venv` 是否可用。
-- 若你的專案是從另一台電腦搬過來，舊 `.venv` 壞掉時會自動改用本機 Python（非 DryRun 模式下也可自動重建 `.venv`）。
-- 如需強制不用 `.venv`，可加上 `-SkipVenvBootstrap`。
-
-停止全部程序：
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
-```
-
-只做檢查不啟動（Dry Run）：
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
-```
-
-只用系統 Python（跳過 `.venv` 建立/修復）：
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps -SkipVenvBootstrap
-```
-
-### 第一步：安裝依賴
+### 第二步：安裝依賴
 ```bash
-pip install -r requirements.txt
+./.venv/Scripts/python.exe -m pip install -r requirements.txt
+不使用 PowerShell 腳本，避免不同電腦 shell/路徑差異造成啟動失敗。
+
+### 第三步：啟動伺服器（終端 1）
+```bash
+./.venv/Scripts/python.exe -m streamlit run app.py
 ```
 
 ### 第二步：啟動伺服器（終端 1）
-```bash
-streamlit run app.py
-```
+### 第四步：啟動 Node 設備（終端 2）
+python -m streamlit run app.py
+./.venv/Scripts/python.exe node.py
 自動在 `http://localhost:8501` 開啟網頁
 
 ### 第三步：啟動 Node 設備（終端 2）
-```bash
+### 第五步：啟動 Bridge（終端 3）
 python node.py
-```
+./.venv/Scripts/python.exe mqtt_bridge.py
 看到「等待伺服器發送挑戰」即表示成功連線
 
 ### 第四步：啟動 Bridge（終端 3）
-```bash
+### 第六步：開始認證流程
 python mqtt_bridge.py
 ```
 看到「MQTT 背景監聽已啟動」與連線成功訊息即表示可開始傳輸
+
+### 停止方式
+- 在三個終端機分別按 `Ctrl + C`。
+- 若 `http://localhost:8501` 開不起來，先確認是否有舊 Streamlit 程序占用 8501。
 
 ### 第五步：開始認證流程
 

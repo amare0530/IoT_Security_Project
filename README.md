@@ -205,40 +205,31 @@ plotly>=5.13.0           # 互動式圖表 (若需要)
 
 ## ⚙️ 快速啟動指南
 
-### Windows 一鍵自動啟動（含前置檢查）
+### 無腳本啟動（建議，跨機器一致）
 
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps
+在專案根目錄開三個終端機，分別執行：
+
+終端機 1（UI 伺服器）：
+
+```bash
+./.venv/Scripts/python.exe -m streamlit run app.py
 ```
 
-此腳本會自動檢查：
-- Python 不可指向 MSYS2 (`C:\msys64\...`)
-- 必要套件 (`paho-mqtt`, `streamlit`, `pandas`)
-- MQTT Broker 可達性 (`broker.emqx.io:1883`)
-- Streamlit 8501 連接埠是否可用
-- `.venv` 是否可用（跨機器搬移導致失效時，會自動改用本機 Python，非 DryRun 時可自動重建 `.venv`）
+終端機 2（IoT Node）：
 
-停止全部程序：
-
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\stop_all.ps1
+```bash
+./.venv/Scripts/python.exe node.py
 ```
 
-只做檢查不啟動（Dry Run）：
+終端機 3（MQTT Bridge）：
 
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -DryRun
+```bash
+./.venv/Scripts/python.exe mqtt_bridge.py
 ```
 
-若要強制使用系統 Python（跳過 `.venv` 建立/修復）：
-
-```powershell
-cd C:\Programming\IoT_Security_Project
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_all.ps1 -InstallDeps -SkipVenvBootstrap
-```
+停止方式：
+- 在各終端機按 `Ctrl + C`。
+- 若 8501 被占用，先關閉舊的 Streamlit 程序後再啟動。
 
 ### 一分鐘快速上手
 
