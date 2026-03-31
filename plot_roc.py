@@ -36,6 +36,7 @@ ROC Curve & Equal Error Rate (EER) Visualization
 import json
 import argparse
 import sys
+import os
 from typing import List, Tuple, Dict
 import math
 
@@ -57,7 +58,7 @@ except ImportError:
 class ROCAnalyzer:
     """ROC 曲線分析器"""
     
-    def __init__(self, json_report_path: str = "batch_test_report.json"):
+    def __init__(self, json_report_path: str = os.path.join("artifacts", "batch_test_report.json")):
         """
         初始化分析器
         
@@ -216,7 +217,7 @@ class ROCAnalyzer:
 # 【繪圖函數】
 # ═══════════════════════════════════════════════════════════════
 
-def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = "roc_curve.png"):
+def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = os.path.join("artifacts", "roc_curve.png")):
     """
     繪製 ROC 曲線
     
@@ -289,6 +290,10 @@ def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = "roc_curve.png"):
     ax2.legend(loc='best')
     ax2.set_ylim([-0.05, 1.05])
     
+    output_dir = os.path.dirname(output_path)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"✅ 已保存圖表: {output_path}")
@@ -331,10 +336,10 @@ def main():
   python plot_roc.py --json other_report.json # 讀取其他報表
         """
     )
-    parser.add_argument('--json', default='batch_test_report.json',
-                       help='JSON 報表路徑 (預設: batch_test_report.json)')
-    parser.add_argument('--output', default='roc_curve.png',
-                       help='輸出圖片路徑 (預設: roc_curve.png)')
+    parser.add_argument('--json', default=os.path.join('artifacts', 'batch_test_report.json'),
+                       help='JSON 報表路徑 (預設: artifacts/batch_test_report.json)')
+    parser.add_argument('--output', default=os.path.join('artifacts', 'roc_curve.png'),
+                       help='輸出圖片路徑 (預設: artifacts/roc_curve.png)')
     parser.add_argument('--show-plot', action='store_true',
                        help='顯示交互式圖表')
     parser.add_argument('--table', action='store_true',

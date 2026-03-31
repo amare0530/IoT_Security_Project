@@ -29,6 +29,7 @@ import csv
 import json
 import time
 import random
+import os
 from datetime import datetime
 from typing import List, Tuple
 import math
@@ -62,8 +63,8 @@ class BatchTestConfig:
     THRESHOLD_RANGE = range(10, 50, 5)  # 測試的閾值範圍 [10, 15, 20, ...]
     
     # 輸出
-    OUTPUT_CSV = "batch_test_results.csv"
-    OUTPUT_REPORT = "batch_test_report.json"
+    OUTPUT_CSV = os.path.join("artifacts", "batch_test_results.csv")
+    OUTPUT_REPORT = os.path.join("artifacts", "batch_test_report.json")
     
     # 時間戳印
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -234,6 +235,7 @@ class BatchTestExecutor:
     def export_csv(self):
         """匯出 CSV 報表"""
         csv_path = self.config.OUTPUT_CSV
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
         
         with open(csv_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=[
@@ -251,6 +253,7 @@ class BatchTestExecutor:
     def export_report(self, analysis_results: list):
         """匯出 JSON 報表"""
         json_path = self.config.OUTPUT_REPORT
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
         
         report = {
             "timestamp": self.config.timestamp,

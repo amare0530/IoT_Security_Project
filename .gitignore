@@ -8,3 +8,14 @@ venv/
 
 # Runtime status artifacts
 bridge_status.json
+challenge_out.json
+response_in.json
+authentication_history.db
+
+# Experiment and plotting outputs
+artifacts/
+batch_test_report.json
+batch_test_results.csv
+sensitivity_analysis.csv
+sensitivity_analysis.json
+roc_curve.png

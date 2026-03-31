@@ -27,6 +27,7 @@ Sensitivity Analysis: Noise Level vs FAR/FRR
 import csv
 import json
 import time
+import os
 from typing import Dict, List
 import math
 
@@ -61,8 +62,8 @@ class SensitivityTestConfig:
     THRESHOLD = 35  # 固定閾值用於比較
     
     # 輸出
-    OUTPUT_CSV = "sensitivity_analysis.csv"
-    OUTPUT_JSON = "sensitivity_analysis.json"
+    OUTPUT_CSV = os.path.join("artifacts", "sensitivity_analysis.csv")
+    OUTPUT_JSON = os.path.join("artifacts", "sensitivity_analysis.json")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -182,6 +183,9 @@ class SensitivityTestExecutor:
     
     def export_results(self):
         """匯出結果"""
+        output_dir = os.path.dirname(self.config.OUTPUT_CSV)
+        os.makedirs(output_dir, exist_ok=True)
+
         # CSV
         with open(self.config.OUTPUT_CSV, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=[

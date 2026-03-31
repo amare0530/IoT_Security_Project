@@ -25,13 +25,13 @@ python batch_test.py
 ```
 ✅ 合法用戶測試完成: 平均 HD = 24.50 bits
 ✅ 冒充者測試完成: 平均 HD = 127.59 bits
-✅ 已匯出 CSV: batch_test_results.csv
-✅ 已匯出 JSON: batch_test_report.json
+✅ 已匯出 CSV: artifacts/batch_test_results.csv
+✅ 已匯出 JSON: artifacts/batch_test_report.json
 ```
 
 **產生的文件**:
-- 📊 `batch_test_results.csv`: 200 行完整測試記錄
-- 📋 `batch_test_report.json`: 統計數據 + ROC 曲線點
+- 📊 `artifacts/batch_test_results.csv`: 200 行完整測試記錄
+- 📋 `artifacts/batch_test_report.json`: 統計數據 + ROC 曲線點
 
 ---
 
@@ -53,11 +53,11 @@ python plot_roc.py --output my_roc.png
 ✅ 分離度: 103.09 bits (⭐⭐⭐ 優秀)
 ✅ EER: 0.0000
 ✅ 最佳閾值: 40 (Accuracy 100%)
-✅ 已保存圖表: roc_curve.png
+✅ 已保存圖表: artifacts/roc_curve.png
 ```
 
 **產生的文件**:
-- 🖼️ `roc_curve.png`: ROC 曲線可視化（兩個子圖）
+- 🖼️ `artifacts/roc_curve.png`: ROC 曲線可視化（兩個子圖）
 
 ---
 
@@ -82,8 +82,8 @@ python sensitivity_analysis.py
 ```
 
 **產生的文件**:
-- 📊 `sensitivity_analysis.csv`: 敏感度分析結果
-- 📋 `sensitivity_analysis.json`: 詳細數據
+- 📊 `artifacts/sensitivity_analysis.csv`: 敏感度分析結果
+- 📋 `artifacts/sensitivity_analysis.json`: 詳細數據
 
 ---
 
@@ -95,8 +95,8 @@ python sensitivity_analysis.py
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 讀取 batch_test_results.csv
-df = pd.read_csv('batch_test_results.csv')
+# 讀取 artifacts/batch_test_results.csv
+df = pd.read_csv('artifacts/batch_test_results.csv')
 
 # 按測試類型分組
 genuine = df[df['test_type'] == 'genuine']['hamming_distance']
@@ -121,7 +121,7 @@ plt.show()
 import json
 
 # 讀取報表
-with open('batch_test_report.json', 'r') as f:
+with open('artifacts/batch_test_report.json', 'r') as f:
     report = json.load(f)
 
 # 提取統計
@@ -255,11 +255,12 @@ IoT_Security_Project/
 ├── plot_roc.py                   # ← Phase 2 分析
 ├── sensitivity_analysis.py        # ← Phase 2 進階
 ├── DYNAMIC_SEED_DESIGN.md         # ← Phase 1 設計文檔
-├── batch_test_results.csv         # ← Phase 2 輸出
-├── batch_test_report.json         # ← Phase 2 輸出
-├── roc_curve.png                  # ← Phase 2 輸出
-├── sensitivity_analysis.csv       # ← Phase 2 進階輸出
-├── sensitivity_analysis.json      # ← Phase 2 進階輸出
+├── artifacts/
+│   ├── batch_test_results.csv     # ← Phase 2 輸出
+│   ├── batch_test_report.json     # ← Phase 2 輸出
+│   ├── roc_curve.png              # ← Phase 2 輸出
+│   ├── sensitivity_analysis.csv   # ← Phase 2 進階輸出
+│   └── sensitivity_analysis.json  # ← Phase 2 進階輸出
 └── [其他既有文件]
 ```
 
@@ -297,7 +298,7 @@ IoT_Security_Project/
 ### 如果圖表畫不出來
 
 - 檢查 matplotlib 是否安裝: `python plot_roc.py --table`（不需要 matplotlib）
-- 檢查 JSON 檔是否完整: `python -c "import json; json.load(open('batch_test_report.json'))"`
+- 檢查 JSON 檔是否完整: `python -c "import json; json.load(open('artifacts/batch_test_report.json'))"`
 
 ---
 
