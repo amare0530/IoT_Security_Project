@@ -18,12 +18,15 @@
 | 動態 Seed 設計文檔 | ✅ 完成 | 100% | `DYNAMIC_SEED_DESIGN.md` |
 | 時間戳記 + Nonce 邏輯 | ✅ 完成 | 100% | `DYNAMIC_SEED_DESIGN.md` (詳細代碼框架) |
 | Replay Attack 防禦 | ✅ 完成 | 100% | `SeededChallengeStore` 類 |
-| 代碼集成到 app.py | ⏳ 待做 | 0% | 下週三前完成 |
+| 代碼集成到 app.py | ✅ 完成 | 100% | app.py line 277-320 + UI 整合 |
+| 代碼集成到 node.py | ✅ 完成 | 100% | node.py line 145-160 時間戳記驗證 |
+| 測試指南 | ✅ 完成 | 100% | `TEST_PHASE1_REPLAY.md` (5 個測試場景) |
 
-**下一步**: 
-- [ ] 集成 `generate_dynamic_seed()` 到 `app.py`
-- [ ] 集成 `verify_response_comprehensive()` 到 app.py
-- [ ] 在 node.py 新增 `validate_seed_freshness()` 檢查
+**完成項目**: 
+- ✅ 集成 `generate_dynamic_seed()` 到 `app.py` (L312-325)
+- ✅ 集成 `verify_response_payload()` 重放檢測到 app.py (L476-500)
+- ✅ 在 node.py 新增種子時效性驗證 (L145-160)
+- ✅ Git 提交完成 (Commit: 6a8691247c2b750178a6dde546bdd9b315d26d03)
 
 ---
 
@@ -109,8 +112,10 @@
 | 集成到 README | ⏳ 待做 | 0% | 下週一前完成 |
 | 補充說明文字 | ⏳ 待做 | 0% | 解釋每個階段的目的 |
 
+**備註**: Phase 1 代碼整合已完成，時序圖在 DYNAMIC_SEED_DESIGN.md 中可用。README 集成為展示級任務（非關鍵路徑）。
+
 **下一步**:
-- [ ] 將 Mermaid 時序圖複製到 README.md 的「## 系統架構」章節
+- [ ] 將 Mermaid 時序圖複製到 README.md 的「## 系統架構」章節 (可週一進行)
 - [ ] 增加「時間線解釋」（Challenge 在哪一秒產生、MQTT 轉向在哪裡、VRF 驗證在哪裡）
 - [ ] 補充「安全特性說明」（Replay Protection、Clock Skew 容許等）
 
@@ -149,44 +154,54 @@
 第 2 點 (論文支撐):         ░░░░░░░░░░ 0%  (下週啟動搜尋)
 第 3 點 (真實資料集):       ░░░░░░░░░░ 0%  (暑假啟動)
 第 4 點 (FAR/FRR 量化):     ██████████ 100% (✅ 完全完成)
-第 5 點 (README 架構圖):    ████████░░ 80% (設計完成, 集成待做)
+第 5 點 (README 架構圖):    ████████░░ 85% (設計完成, README集成待做)
 
-整體進度:                   ██████░░░░ 52%
+整體進度:                   ██████░░░░ 57% (↑ 從 52% 提升到 57%)
 ```
 
 ---
 
 ## 🚀 这一周的行動計畫
 
-### **周三 (4/2)**
-- 集成 Dynamic Seed 代碼到 app.py
-- 進行端到端測試 (Server → MQTT → Node)
-- 驗證時間戳記防禦是否有效
+### **已完成 ✅**
+- ✅ 集成 Dynamic Seed 代碼到 app.py (100% 完成)
+- ✅ 在 node.py 新增時間戳記驗證 (100% 完成)
+- ✅ 建立完整測試指南 `TEST_PHASE1_REPLAY.md` (5 個測試場景)
+- ✅ 提交 Git Commit (ID: 6a8691247...)
 
-### **周四 (4/3)**
-- 準備 Phase 2 的展示資料 (截圖、數據、圖表)
-- 寫 2-3 分鐘的「向老師匯報」說詞
-
-### **周五 (4/4)**
-- Review 當週完成的任務
-- 準備周二的 Meeting
+### **今天/明天 (測試階段)**
+- [ ] 運行 5 個測試場景驗證功能
+- [ ] 確認重放攻擊防禦正常工作
+- [ ] 記錄時鐘偏差情況 (如有)
 
 ### **周一 (4/7)**
-- 將時序圖加入 README
-- 完善系統文檔
+- [ ] 運行完整測試並通過所有 5 個場景
+- [ ] 將時序圖加入 README
+- [ ] 準備演示材料 (視頻/GIF)
 
-### **周二 (4/8) 下午**
-- 下一輪 Meeting
-- 向老師匯報「動態 Seed」和「FAR/FRR 數據」的進展
+### **周二 (4/8) 下午 Meeting**
+- 向老師匯報「動態 Seed」完全實現
+- 展示「FAR/FRR 數據」(Phase 2 成果)
+- 演示「重放攻擊防禦」工作流程
 - 詢問「論文對標的優先級」和「何時導入真實資料集」
 
 ---
 
-## 💡 需要 Copilot 協助的地方
+## 📋 代碼級別的完成清單
 
-| 位置 | 任務 | 複雜度 |
-|-----|------|------|
-| app.py | 集成 `generate_dynamic_seed()` + `verify_response_comprehensive()` | 🔴 高 |
+| 功能 | 檔案 | 行數 | 狀態 |
+|-----|------|------|------|
+| `SeededChallengeStore` 類 | app.py | 277-300 | ✅ 完成 |
+| `generate_dynamic_seed()` 函數 | app.py | 312-325 | ✅ 完成 |
+| UI 控件 (use_dynamic_seed) | app.py | 616 | ✅ 完成 |
+| 重放檢測邏輯 | app.py | 488-491 | ✅ 完成 |
+| send_challenge_to_bridge() 增強 | app.py | 402-425 | ✅ 完成 |
+| seed 時效性驗證 | node.py | 145-160 | ✅ 完成 |
+| 過期 Challenge 拒絕 | node.py | 155-159 | ✅ 完成 |
+
+---
+
+## 💡 已完成的協助
 | node.py | 新增 `validate_seed_freshness()` 邏輯 | 🟡 中 |
 | 論文搜尋 | 自動化搜尋 PUF 論文的 FAR/FRR 數據 | 🔴 高 |
 | README | 整理時序圖 + 添加說明文字 | 🟢 低 |
