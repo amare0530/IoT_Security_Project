@@ -143,6 +143,23 @@ def on_message(client, userdata, msg):
         
         print(f"   Challenge: {challenge[:20]}... (截斷顯示)")
         
+        # 【Phase 1 新增】Step 2.5: 驗證 Seed 時效性 (防重放)
+        timestamp_from_server = payload.get('timestamp')
+        if timestamp_from_server:
+            time_now = time.time()
+            delta_t = time_now - timestamp_from_server
+            max_response_time = payload.get('max_response_time', 10)
+            
+            print(f"⏱️ [Seed] Challenge 延遲: {delta_t:.2f}s (允許上限: {max_response_time}s)")
+            
+            if delta_t > max_response_time:
+                print(f"❌ [Seed] Challenge 已過期 (超過 {max_response_time}s)")
+                print(f"   🚨 拒絕此 Challenge 以防止重放攻擊")
+                print(f"{'='*60}\n")
+                return
+            
+            print(f"✅ [Seed] 時效性驗證通過")
+        
         # Step 3: 模擬硬體延遲
         delay = 0.5
         print(f"⏳ [PUF] 模擬硬體處理 ({delay}s)...")

@@ -36,6 +36,7 @@ import sqlite3
 from datetime import datetime
 import os
 import traceback
+import secrets
 from ui_theme import inject_theme, render_status_badge
 
 # ═══════════════════════════════════════════════════════════════
@@ -273,6 +274,65 @@ def inject_noise(hex_str, num_bits):
         st.error(f"❌ 注入雜訊時發生錯誤: {str(e)}")
         return None
 
+class SeededChallengeStore:
+    """Seed 與 Challenge 記錄庫 - 防止重放攻擊"""
+    
+    def __init__(self, session_state):
+        self.session_state = session_state
+        if "seed_store" not in session_state:
+            session_state["seed_store"] = {}
+    
+    def store_seed(self, nonce, seed, timestamp):
+        """記錄 Seed"""
+        self.session_state["seed_store"][nonce] = {
+            "seed": seed,
+            "timestamp": timestamp,
+            "status": "pending",
+            "responses": []
+        }
+    
+    def verify_and_mark_used(self, nonce, timeout_window=30):
+        """驗證 Seed 並標記為已使用（防重放）"""
+        if nonce not in self.session_state["seed_store"]:
+            return False, "UNKNOWN_NONCE"
+        
+        seed_info = self.session_state["seed_store"][nonce]
+        age = time.time() - seed_info["timestamp"]
+        
+        if age > timeout_window:
+            seed_info["status"] = "expired"
+            return False, "SEED_EXPIRED"
+        
+        if seed_info["status"] == "used":
+            return False, "REPLAY_DETECTED"
+        
+        seed_info["status"] = "used"
+        return True, "VERIFIED"
+
+def generate_dynamic_seed(private_key, granularity=1):
+    """生成動態 Seed (時間戳記 + Nonce)"""
+    try:
+        # 1. 取當前時間戳，按粒度分組
+        timestamp = int(time.time() / granularity) * granularity
+        
+        # 2. 生成隨機 Nonce (256-bit)
+        nonce = secrets.token_hex(32)
+        
+        # 3. 組合 Seed 基礎資訊
+        seed_input = f"{timestamp}:{nonce}:{private_key}"
+        
+        # 4. 用 HMAC-SHA256 生成最終 Seed
+        seed_string = hmac.new(
+            key=private_key.encode(),
+            msg=seed_input.encode(),
+            digestmod=hashlib.sha256
+        ).hexdigest()
+        
+        return seed_string, timestamp, nonce
+    except Exception as e:
+        st.error(f"❌ 動態 Seed 生成失敗: {str(e)}")
+        return None, None, None
+
 def generate_vrf_challenge(private_key, seed):
     """使用 VRF 生成挑戰碼"""
     try:
@@ -299,6 +359,15 @@ if "current_challenge" not in st.session_state:
 
 if "bridge_status" not in st.session_state:
     st.session_state.bridge_status = "未知🚀"
+
+if "seed_store" not in st.session_state:
+    st.session_state.seed_store = SeededChallengeStore(st.session_state)
+
+if "current_nonce" not in st.session_state:
+    st.session_state.current_nonce = None
+
+if "current_seed_timestamp" not in st.session_state:
+    st.session_state.current_seed_timestamp = None
 
 # ==========================================
 # File-based IPC (與 mqtt_bridge.py 通信)
@@ -330,14 +399,25 @@ def clear_response():
     except:
         pass
 
-def send_challenge_to_bridge(challenge, noise_level=3):
+def send_challenge_to_bridge(challenge, noise_level=3, timestamp=None, nonce=None, max_response_time=10):
+    """
+    發送 Challenge 至 Bridge（通過檔案 IPC）
+    【Phase 1 改進】包含時間戳記和 Nonce 以支援重放攻擊檢測
+    """
     try:
+        payload = {
+            "challenge": challenge,
+            "noise_level": noise_level,
+            "timestamp": timestamp or time.time(),  # Server 發送時的時間
+        }
+        
+        # 如果有 Nonce（動態 Seed 模式），加入 payload
+        if nonce:
+            payload["nonce"] = nonce
+            payload["max_response_time"] = max_response_time  # Node 最多多久內要回應
+        
         with open(IN_FILE, "w", encoding="utf-8") as f:
-            json.dump({
-                "challenge": challenge,
-                "noise_level": noise_level,
-                "timestamp": time.time()
-            }, f, indent=2)
+            json.dump(payload, f, indent=2)
         return True
     except Exception as e:
         st.error(f"發送 Challenge 失敗: {e}")
@@ -393,13 +473,29 @@ def get_auth_count():
         return 0
 
 
-def verify_response_payload(challenge, response_data, threshold=5, persist=True):
-    """驗證 response payload，必要時寫入資料庫並回傳結果字典。"""
+def verify_response_payload(challenge, response_data, threshold=5, persist=True, nonce=None, seed_store=None, seed_timeout=30):
+    """
+    驗證 response payload，必要時寫入資料庫並回傳結果字典。
+    【Phase 1 新增】包含重放攻擊檢測
+    """
     response = response_data.get("response") if isinstance(response_data, dict) else None
     device_id = response_data.get("device_id", "Unknown") if isinstance(response_data, dict) else "Unknown"
 
     if not response:
         return None
+
+    # 【Phase 1 新增】重放攻擊檢測
+    if nonce and seed_store:
+        is_valid, reason = seed_store.verify_and_mark_used(nonce, seed_timeout)
+        if not is_valid:
+            return {
+                "device_id": device_id,
+                "hamming_distance": -1,
+                "threshold": threshold,
+                "result": "fail",
+                "response": response,
+                "error": f"🚨 重放攻擊防禦觸發: {reason}"
+            }
 
     hd = calculate_hamming_distance(challenge, response)
     if hd is None:
@@ -515,6 +611,11 @@ with st.sidebar:
     )
     send_noise_level = st.slider("發送雜訊等級", 0, 20, 3)
     verify_threshold = st.slider("驗證門檻", 1, 32, 5)
+    
+    # 【Phase 1 新增】動態 Seed 配置
+    use_dynamic_seed = st.checkbox("使用動態 Seed (防重放)", value=True, help="啟用時間戳記 + Nonce 密鑰防禦")
+    seed_granularity = st.slider("Seed 時間粒度 (秒)", 1, 10, 1, help="時間精度，越小 Seed 更新越快")
+    seed_timeout = st.slider("Seed 有效期 (秒)", 10, 60, 30, help="超過此時間 Challenge 將過期")
 
     st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
     if st.button("清空 Response 快取", use_container_width=True):
@@ -549,11 +650,15 @@ def verify_latest_response(threshold):
         st.info("ℹ️ 這筆 Response 已驗證過，未重複寫入資料庫")
         return
 
+    # 【Phase 1 改進】傳入 Nonce 和 seed_store 以進行重放攻擊檢測
     verify_result = verify_response_payload(
         challenge=st.session_state.current_challenge,
         response_data=latest_response,
         threshold=threshold,
         persist=True,
+        nonce=st.session_state.current_nonce,
+        seed_store=st.session_state.seed_store,
+        seed_timeout=seed_timeout,
     )
     if verify_result:
         update_verification_state(verify_result, recv_time)
@@ -570,18 +675,47 @@ with action_cols[3]:
     run_check = st.button("3. 驗證最新回應", use_container_width=True)
 
 if run_generate:
-    challenge, proof = generate_vrf_challenge(sk, seed_input)
-    if challenge:
-        st.session_state.current_challenge = challenge
-        st.session_state.current_proof = proof
-        st.success("✅ Challenge 已生成")
+    # 【Phase 1 改進】使用動態 Seed 或靜態 Seed
+    if use_dynamic_seed:
+        # 動態 Seed：時間戳記 + Nonce
+        dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
+        if dynamic_seed:
+            st.session_state.current_nonce = nonce
+            st.session_state.current_seed_timestamp = timestamp
+            st.session_state.seed_store.store_seed(nonce, dynamic_seed, timestamp)
+            challenge, proof = generate_vrf_challenge(sk, dynamic_seed)
+            if challenge:
+                st.session_state.current_challenge = challenge
+                st.session_state.current_proof = proof
+                st.success("✅ 動態 Challenge 已生成 (防重放)")
+                st.info(f"🔐 Nonce: {nonce[:16]}... | Timestamp: {timestamp}")
+        else:
+            st.error("❌ 動態 Seed 生成失敗")
+    else:
+        # 靜態 Seed：使用用戶輸入
+        challenge, proof = generate_vrf_challenge(sk, seed_input)
+        if challenge:
+            st.session_state.current_challenge = challenge
+            st.session_state.current_proof = proof
+            st.warning("⚠️ 使用靜態 Seed（未啟用重放攻擊防禦）")
+        else:
+            st.error("❌ Challenge 生成失敗")
 
 if run_send:
     if not st.session_state.current_challenge:
         st.error("❌ 請先生成 Challenge")
     else:
         clear_response()
-        sent_ok = send_challenge_to_bridge(st.session_state.current_challenge, send_noise_level)
+        # 【Phase 1】傳遞時間戳記和 Nonce 以支援重放攻擊檢測
+        timestamp = st.session_state.current_seed_timestamp if use_dynamic_seed else None
+        nonce = st.session_state.current_nonce if use_dynamic_seed else None
+        sent_ok = send_challenge_to_bridge(
+            st.session_state.current_challenge, 
+            send_noise_level,
+            timestamp=timestamp,
+            nonce=nonce,
+            max_response_time=seed_timeout
+        )
         if sent_ok:
             st.session_state.challenge_sent_time = time.time()
             st.success("✅ Challenge 已發送")
