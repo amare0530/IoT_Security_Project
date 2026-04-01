@@ -50,6 +50,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def inject_frontend_performance_polyfill():
+    """Inject lightweight browser polyfills for Performance APIs used by frontend bundles."""
+    st.markdown(
+        """
+        <script>
+        (function () {
+            if (typeof window === 'undefined') return;
+            var perf = window.performance || {};
+            if (typeof perf.clearMarks !== 'function') {
+                perf.clearMarks = function () {};
+            }
+            if (typeof perf.clearMeasures !== 'function') {
+                perf.clearMeasures = function () {};
+            }
+            if (typeof perf.mark !== 'function') {
+                perf.mark = function () {};
+            }
+            if (typeof perf.measure !== 'function') {
+                perf.measure = function () { return { duration: 0 }; };
+            }
+            if (window.performance !== perf) {
+                window.performance = perf;
+            }
+        })();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Prevent intermittent frontend warnings like "mgt.clearMarks is not a function"
+# in constrained webviews without full Performance API support.
+inject_frontend_performance_polyfill()
+
 # ═══════════════════════════════════════════════════════════════
 # 【數據庫管理模組】
 # ═══════════════════════════════════════════════════════════════
@@ -92,10 +125,26 @@ def init_database():
                 passed_tests INTEGER,
                 failed_tests INTEGER,
                 frr REAL,
+                pass_rate REAL,
                 avg_distance REAL,
+                hd_std REAL,
+                hd_p10 REAL,
+                hd_p90 REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        # 向後相容：舊資料庫若缺少新統計欄位，啟動時自動補齊。
+        cursor.execute("PRAGMA table_info(batch_experiments)")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        for col_name, col_type in [
+            ("pass_rate", "REAL"),
+            ("hd_std", "REAL"),
+            ("hd_p10", "REAL"),
+            ("hd_p90", "REAL"),
+        ]:
+            if col_name not in existing_cols:
+                cursor.execute(f"ALTER TABLE batch_experiments ADD COLUMN {col_name} {col_type}")
         
         # 索引優化
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON auth_history(timestamp)')
@@ -131,7 +180,20 @@ def save_auth_result(device_id, challenge, response, hamming_distance, threshold
         st.warning(f"⚠️ 保存認證記錄失敗: {str(e)}")
         return False
 
-def save_batch_experiment(batch_id, noise_level, threshold, total, passed, failed, frr, avg_distance):
+def save_batch_experiment(
+    batch_id,
+    noise_level,
+    threshold,
+    total,
+    passed,
+    failed,
+    frr,
+    avg_distance,
+    pass_rate=None,
+    hd_std=None,
+    hd_p10=None,
+    hd_p90=None,
+):
     """保存批量實驗統計"""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -141,9 +203,23 @@ def save_batch_experiment(batch_id, noise_level, threshold, total, passed, faile
         
         cursor.execute('''
             INSERT INTO batch_experiments 
-            (batch_id, timestamp, noise_level, threshold, total_tests, passed_tests, failed_tests, frr, avg_distance)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (batch_id, timestamp, noise_level, threshold, total, passed, failed, frr, avg_distance))
+            (batch_id, timestamp, noise_level, threshold, total_tests, passed_tests, failed_tests, frr, pass_rate, avg_distance, hd_std, hd_p10, hd_p90)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            batch_id,
+            timestamp,
+            noise_level,
+            threshold,
+            total,
+            passed,
+            failed,
+            frr,
+            pass_rate,
+            avg_distance,
+            hd_std,
+            hd_p10,
+            hd_p90,
+        ))
         
         conn.commit()
         conn.close()
@@ -255,19 +331,22 @@ def calculate_hamming_distance(s1, s2):
         return None
 
 def inject_noise(hex_str, num_bits):
-    """模擬硬體製程雜訊"""
+    """模擬硬體製程雜訊（以機率翻轉，避免固定 HD 造成全過/全錯）"""
     try:
         if num_bits == 0:
             return hex_str
         
         if num_bits > 256:
             raise ValueError("雜訊位元數不能超過 256")
-        
+
         bits = list(bin(int(hex_str, 16))[2:].zfill(256))
-        indices = random.sample(range(256), num_bits)
-        
-        for i in indices:
-            bits[i] = '1' if bits[i] == '0' else '0'
+
+        # 以期望翻轉數 num_bits 建立 Bernoulli 機率，
+        # 讓批量測試能反映分佈而非每次都固定 HD。
+        p_flip = max(0.0, min(1.0, num_bits / 256.0))
+        for i in range(256):
+            if random.random() < p_flip:
+                bits[i] = '1' if bits[i] == '0' else '0'
         
         return hex(int("".join(bits), 2))[2:].zfill(64)
     except Exception as e:
@@ -276,15 +355,16 @@ def inject_noise(hex_str, num_bits):
 
 class SeededChallengeStore:
     """Seed 與 Challenge 記錄庫 - 防止重放攻擊"""
+    STORAGE_KEY = "seed_records"
     
     def __init__(self, session_state):
         self.session_state = session_state
-        if "seed_store" not in session_state:
-            session_state["seed_store"] = {}
+        if self.STORAGE_KEY not in session_state:
+            session_state[self.STORAGE_KEY] = {}
     
     def store_seed(self, nonce, seed, timestamp):
         """記錄 Seed"""
-        self.session_state["seed_store"][nonce] = {
+        self.session_state[self.STORAGE_KEY][nonce] = {
             "seed": seed,
             "timestamp": timestamp,
             "status": "pending",
@@ -293,10 +373,10 @@ class SeededChallengeStore:
     
     def verify_and_mark_used(self, nonce, timeout_window=30):
         """驗證 Seed 並標記為已使用（防重放）"""
-        if nonce not in self.session_state["seed_store"]:
+        if nonce not in self.session_state[self.STORAGE_KEY]:
             return False, "UNKNOWN_NONCE"
         
-        seed_info = self.session_state["seed_store"][nonce]
+        seed_info = self.session_state[self.STORAGE_KEY][nonce]
         age = time.time() - seed_info["timestamp"]
         
         if age > timeout_window:
@@ -334,15 +414,15 @@ def generate_dynamic_seed(private_key, granularity=1):
         return None, None, None
 
 def generate_vrf_challenge(private_key, seed):
-    """使用 VRF 生成挑戰碼"""
+    """使用 HMAC-PRF 生成挑戰碼（教學用 pseudo-VRF 介面）。"""
     try:
         if not private_key or not seed:
             raise ValueError("私鑰和種子不能為空")
         
-        # HMAC-SHA256 產生確定性挑戰
+        # HMAC-SHA256 產生確定性挑戰（PRF）
         c = hmac.new(private_key.encode(), seed.encode(), hashlib.sha256).hexdigest()
         
-        # 生成 Proof
+        # 生成伺服器側完整性摘要（非公開可驗證的標準 VRF proof）
         proof = hashlib.sha256((c + private_key).encode()).hexdigest()[:20]
         
         return c, proof
@@ -480,9 +560,31 @@ def verify_response_payload(challenge, response_data, threshold=5, persist=True,
     """
     response = response_data.get("response") if isinstance(response_data, dict) else None
     device_id = response_data.get("device_id", "Unknown") if isinstance(response_data, dict) else "Unknown"
+    response_nonce = response_data.get("nonce") if isinstance(response_data, dict) else None
 
     if not response:
         return None
+
+    # 若啟用動態 Seed，必須確保回傳的 nonce 與當前 Session 一致。
+    if nonce:
+        if not response_nonce:
+            return {
+                "device_id": device_id,
+                "hamming_distance": -1,
+                "threshold": threshold,
+                "result": "fail",
+                "response": response,
+                "error": "🚨 缺少 nonce，無法驗證回應是否屬於當前 Session"
+            }
+        if response_nonce != nonce:
+            return {
+                "device_id": device_id,
+                "hamming_distance": -1,
+                "threshold": threshold,
+                "result": "fail",
+                "response": response,
+                "error": "🚨 nonce 不一致，疑似跨 Session 回放或混淆"
+            }
 
     # 【Phase 1 新增】重放攻擊檢測
     if nonce and seed_store:
@@ -726,17 +828,46 @@ if run_check:
     verify_latest_response(verify_threshold)
 
 if run_one_click:
-    challenge, proof = generate_vrf_challenge(sk, seed_input)
-    if challenge:
-        st.session_state.current_challenge = challenge
-        st.session_state.current_proof = proof
-        clear_response()
-        sent_ok = send_challenge_to_bridge(challenge, send_noise_level)
-        if sent_ok:
-            st.session_state.challenge_sent_time = time.time()
-            verify_latest_response(verify_threshold)
+    # 一鍵驗證需與步驟模式一致，避免繞過動態 Seed 防重放機制。
+    if use_dynamic_seed:
+        dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
+        if not dynamic_seed:
+            st.error("❌ 動態 Seed 生成失敗，無法完成一鍵驗證")
         else:
-            st.error("❌ 發送失敗，無法完成一鍵驗證")
+            st.session_state.current_nonce = nonce
+            st.session_state.current_seed_timestamp = timestamp
+            st.session_state.seed_store.store_seed(nonce, dynamic_seed, timestamp)
+            challenge, proof = generate_vrf_challenge(sk, dynamic_seed)
+            if challenge:
+                st.session_state.current_challenge = challenge
+                st.session_state.current_proof = proof
+                clear_response()
+                sent_ok = send_challenge_to_bridge(
+                    challenge,
+                    send_noise_level,
+                    timestamp=timestamp,
+                    nonce=nonce,
+                    max_response_time=seed_timeout,
+                )
+                if sent_ok:
+                    st.session_state.challenge_sent_time = time.time()
+                    verify_latest_response(verify_threshold)
+                else:
+                    st.error("❌ 發送失敗，無法完成一鍵驗證")
+    else:
+        st.session_state.current_nonce = None
+        st.session_state.current_seed_timestamp = None
+        challenge, proof = generate_vrf_challenge(sk, seed_input)
+        if challenge:
+            st.session_state.current_challenge = challenge
+            st.session_state.current_proof = proof
+            clear_response()
+            sent_ok = send_challenge_to_bridge(challenge, send_noise_level)
+            if sent_ok:
+                st.session_state.challenge_sent_time = time.time()
+                verify_latest_response(verify_threshold)
+            else:
+                st.error("❌ 發送失敗，無法完成一鍵驗證")
 
 st.divider()
 
@@ -829,8 +960,26 @@ with tab_batch:
                     passed = sum(1 for item in results if item["result"] == "pass")
                     failed = len(results) - passed
                     frr = (failed / len(results) * 100) if results else 0
+                    pass_rate = (passed / len(results) * 100) if results else 0
                     avg_hd = sum(item["hd"] for item in results) / len(results)
-                    save_batch_experiment(batch_id, exp_noise, exp_threshold, len(results), passed, failed, frr, avg_hd)
+                    hd_values = [item["hd"] for item in results]
+                    hd_std = pd.Series(hd_values).std(ddof=0)
+                    hd_p10 = pd.Series(hd_values).quantile(0.10)
+                    hd_p90 = pd.Series(hd_values).quantile(0.90)
+                    save_batch_experiment(
+                        batch_id,
+                        exp_noise,
+                        exp_threshold,
+                        len(results),
+                        passed,
+                        failed,
+                        frr,
+                        avg_hd,
+                        pass_rate=pass_rate,
+                        hd_std=hd_std,
+                        hd_p10=hd_p10,
+                        hd_p90=hd_p90,
+                    )
 
                     s1, s2, s3 = st.columns(3)
                     with s1:
@@ -839,6 +988,10 @@ with tab_batch:
                         st.metric("失敗", f"{failed}")
                     with s3:
                         st.metric("FRR", f"{frr:.1f}%")
+
+                    st.caption(
+                        f"HD 分佈：平均 {avg_hd:.2f} | 標準差 {hd_std:.2f} | P10 {hd_p10:.1f} | P90 {hd_p90:.1f}"
+                    )
 
                     st.success(f"✅ 實驗完成（Batch ID: {batch_id}）")
             except Exception as e:

@@ -4,11 +4,15 @@ import secrets
 
 class SimpleVRF:
     """
-    這是一個符合 VRF 邏輯的實作（基於 HMAC-SHA256）。
-    它具備 VRF 的三大特性：
+    教學用 pseudo-VRF（基於 HMAC-SHA256 的 PRF）。
+    它具備：
     1. Deterministic (確定性)：同樣的私鑰與 Seed 產出同樣的 C。
     2. Unpredictable (不可預測性)：沒有私鑰的人無法預測下一個 C。
-    3. Verifiable (可驗證性)：持有公鑰與 Proof 即可驗證 C 的合法性。
+    3. Server-side check (伺服器端可驗證)：伺服器可重算並驗證 C 與摘要。
+
+    注意：
+    這不是 RFC 9381 定義的公鑰 VRF（例如 ECVRF），
+    proof 也不是可由第三方使用公鑰獨立驗證的證明。
     """
     def __init__(self, server_key):
         self.sk = server_key
@@ -16,7 +20,7 @@ class SimpleVRF:
     def generate_challenge(self, seed):
         # 產生唯一且隨機的挑戰碼 C
         c = hmac.new(self.sk.encode(), seed.encode(), hashlib.sha256).hexdigest()
-        # 產生證明 Proof (模擬非對稱證明)
+        # 產生完整性摘要（server-side check）
         proof = hashlib.sha256((c + self.sk).encode()).hexdigest()[:20]
         return c, proof
 

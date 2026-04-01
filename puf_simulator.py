@@ -42,18 +42,20 @@ class PUFConfig:
     def __init__(
       self,
       response_bits: int = 256,
-      noise_sigma: float = 0.05,
+      noise_sigma: float = 0.03,
       use_hamming74_ecc: bool = False,
-      cluster_noise_prob: float = 0.0,
+      use_ecc_interleaving: bool = False,
+      ecc_interleaving_depth: int = 8,
+      cluster_noise_prob: float = 0.02,
       cluster_size: int = 4,
       bias_ratio: float = 0.10,
       unstable_ratio: float = 0.08,
       bias_strength: float = 0.90,
-      unstable_extra_noise: float = 0.16,
-      env_noise_sigma: float = 0.02,
-      env_spike_prob: float = 0.20,
-      env_spike_min: float = 0.20,
-      env_spike_max: float = 0.34,
+      unstable_extra_noise: float = 0.08,
+      env_noise_sigma: float = 0.005,
+      env_spike_prob: float = 0.05,
+      env_spike_min: float = 0.05,
+      env_spike_max: float = 0.12,
     ):
         """
         参数：
@@ -70,6 +72,8 @@ class PUFConfig:
         self.response_bits = response_bits
         self.noise_sigma = noise_sigma
         self.use_hamming74_ecc = use_hamming74_ecc
+        self.use_ecc_interleaving = use_ecc_interleaving
+        self.ecc_interleaving_depth = ecc_interleaving_depth
         self.cluster_noise_prob = cluster_noise_prob
         self.cluster_size = cluster_size
         self.bias_ratio = bias_ratio
@@ -87,6 +91,7 @@ class PUFConfig:
         assert self.response_bits > 0, f"Response bits 必须 > 0"
         if self.use_hamming74_ecc:
           assert self.response_bits % 4 == 0, "使用 Hamming(7,4) 時 response_bits 必须為 4 的倍數"
+          assert self.ecc_interleaving_depth >= 2, "ecc_interleaving_depth 必须 >= 2"
         assert 0.0 <= self.cluster_noise_prob <= 1.0, "cluster_noise_prob 必须在 0.0~1.0 之間"
         assert self.cluster_size >= 2, "cluster_size 必须 >= 2"
         assert 0.0 <= self.bias_ratio <= 0.50, f"bias_ratio 必须在 0.0~0.50 之間"
@@ -183,16 +188,59 @@ class PUFSimulator:
         return f"{bits[2]}{bits[4]}{bits[5]}{bits[6]}"
 
     def _hamming74_encode_bits(self, bitstr: str) -> str:
-        encoded = []
-        for i in range(0, len(bitstr), 4):
-            encoded.append(self._hamming74_encode_nibble(bitstr[i:i+4]))
-        return "".join(encoded)
+      encoded = []
+      for i in range(0, len(bitstr), 4):
+        encoded.append(self._hamming74_encode_nibble(bitstr[i:i+4]))
+
+      channel_bits = "".join(encoded)
+      if self.config.use_ecc_interleaving:
+        return self._interleave_bits(channel_bits, self.config.ecc_interleaving_depth)
+      return channel_bits
 
     def _hamming74_decode_bits(self, encoded_bitstr: str) -> str:
-        decoded = []
-        for i in range(0, len(encoded_bitstr), 7):
-            decoded.append(self._hamming74_decode_codeword(encoded_bitstr[i:i+7]))
-        return "".join(decoded)
+      channel_bits = encoded_bitstr
+      if self.config.use_ecc_interleaving:
+        channel_bits = self._deinterleave_bits(encoded_bitstr, self.config.ecc_interleaving_depth)
+
+      decoded = []
+      for i in range(0, len(channel_bits), 7):
+        decoded.append(self._hamming74_decode_codeword(channel_bits[i:i+7]))
+      return "".join(decoded)
+
+    @staticmethod
+    def _interleave_bits(bitstr: str, depth: int) -> str:
+      """把連續位元打散，降低 burst error 對單一區塊 ECC 的破壞。"""
+      d = max(2, depth)
+      cols = math.ceil(len(bitstr) / d)
+      padded_len = d * cols
+      padded = bitstr.ljust(padded_len, "0")
+
+      out = []
+      for c in range(cols):
+        for r in range(d):
+          out.append(padded[r * cols + c])
+
+      return "".join(out)[:len(bitstr)]
+
+    @staticmethod
+    def _deinterleave_bits(bitstr: str, depth: int) -> str:
+      """_interleave_bits 的逆操作。"""
+      d = max(2, depth)
+      cols = math.ceil(len(bitstr) / d)
+      padded_len = d * cols
+      interleaved = bitstr.ljust(padded_len, "0")
+
+      matrix = [["0"] * cols for _ in range(d)]
+      idx = 0
+      for c in range(cols):
+        for r in range(d):
+          matrix[r][c] = interleaved[idx]
+          idx += 1
+
+      out = []
+      for r in range(d):
+        out.extend(matrix[r])
+      return "".join(out)[:len(bitstr)]
 
     @staticmethod
     def _clamp(prob: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -411,7 +459,14 @@ class AuthenticationEngine:
       在沒有繞過 Nonce 機制的情況下，無法重複使用
     """
     
-    def __init__(self, threshold: int = 40):
+    def __init__(
+        self,
+        threshold: int = 40,
+        helper_integrity_key: Optional[str] = None,
+        use_privacy_amplification: bool = True,
+        privacy_threshold: int = 0,
+      enforce_privacy_gate: bool = False,
+    ):
         """
         參數：
           threshold: 漢明距離閾值
@@ -422,8 +477,12 @@ class AuthenticationEngine:
         # 【Phase 2】Nonce 快取 - 存儲已使用過的一次性隨機數
         self.used_nonces: Set[str] = set()
         self.nonce_cache_size_limit = 1000  # 防止記憶體無限增長
-        # Enrollment 存儲：challenge -> helper data（公開）
-        self.helper_data_store: Dict[str, str] = {}
+        # Enrollment 存儲：challenge -> helper record（公開 helper + integrity tag）
+        self.helper_data_store: Dict[str, Dict[str, str]] = {}
+        self.helper_integrity_key = helper_integrity_key or "LOCAL_DEV_HELPER_KEY_CHANGE_IN_PRODUCTION"
+        self.use_privacy_amplification = use_privacy_amplification
+        self.privacy_threshold = max(0, privacy_threshold)
+        self.enforce_privacy_gate = enforce_privacy_gate
 
     @staticmethod
     def _hamming74_parity_for_nibble(nibble_bits: str) -> str:
@@ -472,11 +531,32 @@ class AuthenticationEngine:
         # 256 data bits -> 64 nibbles -> 192 helper bits
         return self._pack_bits_to_hex("".join(helper_bits))
 
-    def enroll_challenge(self, challenge: str, expected_response: str) -> str:
+    def _helper_integrity_tag(self, challenge: str, helper_hex: str) -> str:
+        """為 helper data 計算 HMAC 標籤，防止可見但可改的資料被靜默篡改。"""
+        payload = f"{challenge}|{helper_hex}".encode("utf-8")
+        return hmac.new(
+            key=self.helper_integrity_key.encode("utf-8"),
+            msg=payload,
+            digestmod=hashlib.sha256,
+        ).hexdigest()
+
+    def verify_helper_data_integrity(self, challenge: str, helper_hex: str, helper_tag: str) -> bool:
+        """常數時間驗證 helper data 是否被篡改。"""
+        expected_tag = self._helper_integrity_tag(challenge, helper_hex)
+        return hmac.compare_digest(expected_tag, helper_tag)
+
+    def enroll_challenge(self, challenge: str, expected_response: str) -> Dict[str, str]:
         """Enrollment 階段：為 challenge 註冊 helper data。"""
         helper_hex = self.generate_helper_data(expected_response)
-        self.helper_data_store[challenge] = helper_hex
-        return helper_hex
+        helper_tag = self._helper_integrity_tag(challenge, helper_hex)
+
+        record = {
+            "helper_hex": helper_hex,
+            "helper_tag": helper_tag,
+            "version": "hamming74+hmac-v1"
+        }
+        self.helper_data_store[challenge] = record
+        return record
 
     def reconstruct_response_with_helper(self, raw_response: str, helper_hex: str) -> str:
         """
@@ -498,6 +578,16 @@ class AuthenticationEngine:
 
         corrected_bits = "".join(corrected_chunks)
         return hex(int(corrected_bits, 2))[2:].zfill(64)
+
+    @staticmethod
+    def _privacy_amplify_response(response_hex: str) -> str:
+        """用 SHA-256 做熵擠壓，降低偏壓與相關性對最終金鑰的影響。"""
+        normalized = response_hex.strip().lower()
+        # fromhex 要求偶數長度，理論上 256-bit 是 64 chars，這裡做防呆補零。
+        if len(normalized) % 2 == 1:
+            normalized = "0" + normalized
+        response_bytes = bytes.fromhex(normalized)
+        return hashlib.sha256(response_bytes).hexdigest()
     
     def authenticate(self, hd: int) -> bool:
         """
@@ -509,13 +599,13 @@ class AuthenticationEngine:
         return hd <= self.threshold
     
     def verify_session(
-      self,
-      response: str,
-      expected_response: str,
-      nonce: str,
-      challenge: Optional[str] = None,
-      server_timestamp: Optional[float] = None,
-      max_age_seconds: int = 60,
+        self,
+        response: str,
+        expected_response: str,
+        nonce: str,
+        challenge: Optional[str] = None,
+        server_timestamp: Optional[float] = None,
+        max_age_seconds: int = 60,
     ) -> Dict:
         """
         【Phase 2】Session-based 認證 - 包含重放攻擊防護
@@ -542,15 +632,15 @@ class AuthenticationEngine:
         """
         # 0. 檢查時間戳是否過期（協議層時效性防護）
         if server_timestamp is not None and not self._is_timestamp_valid(server_timestamp, max_age_seconds):
-          return {
-            "authenticated": False,
-            "reason": "Auth Failed (Timestamp Expired)",
-            "hd": -1,
-            "nonce_used": False,
-            "threshold": self.threshold,
-            "timestamp_valid": False,
-            "security_note": f"server_timestamp 超過 {max_age_seconds} 秒有效窗口"
-          }
+            return {
+                "authenticated": False,
+                "reason": "Auth Failed (Timestamp Expired)",
+                "hd": -1,
+                "nonce_used": False,
+                "threshold": self.threshold,
+                "timestamp_valid": False,
+                "security_note": f"server_timestamp 超過 {max_age_seconds} 秒有效窗口"
+            }
 
         # 1. 檢查 Nonce - 防重放攻擊
         if nonce in self.used_nonces:
@@ -566,20 +656,64 @@ class AuthenticationEngine:
         # 2. 使用 helper data（若 challenge 已 enrollment）進行重建
         response_for_compare = response
         helper_used = False
+        helper_integrity_ok = None
         if challenge is not None and challenge in self.helper_data_store:
-          response_for_compare = self.reconstruct_response_with_helper(
-            raw_response=response,
-            helper_hex=self.helper_data_store[challenge]
-          )
-          helper_used = True
+            record = self.helper_data_store[challenge]
 
-        # 3. 計算漢明距離
-        hd = self._compute_hamming_distance_from_hex(response_for_compare, expected_response)
+            # 向後相容：舊版只存 helper_hex 字串。
+            if isinstance(record, str):
+                helper_hex = record
+                helper_tag = ""
+                helper_integrity_ok = True
+            else:
+                helper_hex = record["helper_hex"]
+                helper_tag = record.get("helper_tag", "")
+                helper_integrity_ok = self.verify_helper_data_integrity(challenge, helper_hex, helper_tag)
+
+            if helper_integrity_ok is False:
+                return {
+                    "authenticated": False,
+                    "reason": "Auth Failed (Helper Data Tampered)",
+                    "hd": -1,
+                    "raw_hd": -1,
+                    "pa_hd": -1,
+                    "nonce_used": False,
+                    "threshold": self.threshold,
+                    "timestamp_valid": True,
+                    "helper_data_used": True,
+                    "helper_integrity_ok": False,
+                    "security_note": "Helper data HMAC 驗證失敗，疑似遭到篡改。"
+                }
+
+            response_for_compare = self.reconstruct_response_with_helper(
+                raw_response=response,
+                helper_hex=helper_hex
+            )
+            helper_used = True
+
+        # 3. 計算漢明距離（保留原始統計）
+        raw_hd = self._compute_hamming_distance_from_hex(response_for_compare, expected_response)
         
-        # 3. 執行基本認證（HD 門檻檢查）
-        auth_result = self.authenticate(hd)
+        # 4. 先做原始 HD 門檻檢查
+        raw_auth_ok = self.authenticate(raw_hd)
+
+        # 5. 隱私放大：將糾錯後響應擠壓到均勻雜湊空間再比對
+        pa_hd = -1
+        pa_auth_ok = True
+        if self.use_privacy_amplification:
+            pa_response = self._privacy_amplify_response(response_for_compare)
+            pa_expected = self._privacy_amplify_response(expected_response)
+            pa_hd = self._compute_hamming_distance_from_hex(pa_response, pa_expected)
+
+            if self.privacy_threshold == 0:
+                # 最嚴格模式：常數時間完全匹配
+                pa_auth_ok = hmac.compare_digest(pa_response, pa_expected)
+            else:
+                pa_auth_ok = pa_hd <= self.privacy_threshold
+
+        auth_result = raw_auth_ok and (pa_auth_ok if self.enforce_privacy_gate else True)
         
-        # 4. 如果認證成功，記錄 Nonce（防止將來重複使用）
+        # 6. 如果認證成功，記錄 Nonce（防止將來重複使用）
         if auth_result:
             self.used_nonces.add(nonce)
             
@@ -594,11 +728,17 @@ class AuthenticationEngine:
         return {
             "authenticated": auth_result,
             "reason": "Auth Success" if auth_result else "Auth Failed (HD exceeded)",
-            "hd": hd,
+            "hd": raw_hd,
+            "raw_hd": raw_hd,
+            "pa_hd": pa_hd,
             "nonce_used": False,
             "threshold": self.threshold,
             "timestamp_valid": True,
             "helper_data_used": helper_used,
+            "helper_integrity_ok": helper_integrity_ok,
+            "privacy_amplification_used": self.use_privacy_amplification,
+            "privacy_threshold": self.privacy_threshold,
+            "privacy_gate_enforced": self.enforce_privacy_gate,
             "cache_size": len(self.used_nonces)
         }
 

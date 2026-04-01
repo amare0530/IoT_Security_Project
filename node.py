@@ -137,6 +137,7 @@ def on_message(client, userdata, msg):
         
         # Step 2: 驗證必要欄位
         challenge = payload.get('challenge')
+        nonce = payload.get('nonce')
         if not challenge:
             print(f"❌ [Node] 缺少 Challenge 欄位")
             return
@@ -184,6 +185,7 @@ def on_message(client, userdata, msg):
             "response": response,
             "timestamp": time.time(),
             "noise_level": noise_level,
+            "nonce": nonce,
             "status": "success"
         }
         

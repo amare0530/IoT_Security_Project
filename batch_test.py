@@ -43,6 +43,7 @@ from puf_simulator import (
     generate_challenge,
     print_stats
 )
+from config import get_realistic_puf_profile
 
 # ═══════════════════════════════════════════════════════════════
 # 【配置】
@@ -55,8 +56,19 @@ class BatchTestConfig:
     NUM_GENUINE = 100          # 合法用戶測試次數
     NUM_IMPOSTOR = 100         # 冒充者測試次數
     
-    # PUF 參數
-    NOISE_SIGMA = 0.05         # 5% 位元翻轉率 (中等雜訊)
+    # PUF 參數（使用較貼近現場的保守預設，避免過度理想化）
+    REALISTIC = get_realistic_puf_profile()
+    NOISE_SIGMA = REALISTIC["noise_sigma"]
+    BIAS_RATIO = REALISTIC["bias_ratio"]
+    BIAS_STRENGTH = REALISTIC["bias_strength"]
+    UNSTABLE_RATIO = REALISTIC["unstable_ratio"]
+    UNSTABLE_EXTRA_NOISE = REALISTIC["unstable_extra_noise"]
+    CLUSTER_NOISE_PROB = REALISTIC["cluster_noise_prob"]
+    CLUSTER_SIZE = REALISTIC["cluster_size"]
+    ENV_NOISE_SIGMA = REALISTIC["env_noise_sigma"]
+    ENV_SPIKE_PROB = REALISTIC["env_spike_prob"]
+    ENV_SPIKE_MIN = REALISTIC["env_spike_min"]
+    ENV_SPIKE_MAX = REALISTIC["env_spike_max"]
     puf_key = "PUF_DEVICE_UNIQUE_KEY_001"  # 設備唯一密鑰
     
     # 認證參數
@@ -83,7 +95,17 @@ class BatchTestExecutor:
         # 初始化 PUF 模擬器
         puf_config = PUFConfig(
             response_bits=256,
-            noise_sigma=config.NOISE_SIGMA
+            noise_sigma=config.NOISE_SIGMA,
+            bias_ratio=config.BIAS_RATIO,
+            bias_strength=config.BIAS_STRENGTH,
+            unstable_ratio=config.UNSTABLE_RATIO,
+            unstable_extra_noise=config.UNSTABLE_EXTRA_NOISE,
+            cluster_noise_prob=config.CLUSTER_NOISE_PROB,
+            cluster_size=config.CLUSTER_SIZE,
+            env_noise_sigma=config.ENV_NOISE_SIGMA,
+            env_spike_prob=config.ENV_SPIKE_PROB,
+            env_spike_min=config.ENV_SPIKE_MIN,
+            env_spike_max=config.ENV_SPIKE_MAX,
         )
         self.puf = PUFSimulator(config.puf_key, puf_config)
         
@@ -161,7 +183,23 @@ class BatchTestExecutor:
         
         # 模擬攻擊者的「偽造」PUF (完全不同的設備)
         fake_puf_key = "ATTACKER_FAKE_PUF_KEY_999"
-        fake_puf = PUFSimulator(fake_puf_key, PUFConfig(response_bits=256, noise_sigma=0.05))
+        fake_puf = PUFSimulator(
+            fake_puf_key,
+            PUFConfig(
+                response_bits=256,
+                noise_sigma=self.config.NOISE_SIGMA,
+                bias_ratio=self.config.BIAS_RATIO,
+                bias_strength=self.config.BIAS_STRENGTH,
+                unstable_ratio=self.config.UNSTABLE_RATIO,
+                unstable_extra_noise=self.config.UNSTABLE_EXTRA_NOISE,
+                cluster_noise_prob=self.config.CLUSTER_NOISE_PROB,
+                cluster_size=self.config.CLUSTER_SIZE,
+                env_noise_sigma=self.config.ENV_NOISE_SIGMA,
+                env_spike_prob=self.config.ENV_SPIKE_PROB,
+                env_spike_min=self.config.ENV_SPIKE_MIN,
+                env_spike_max=self.config.ENV_SPIKE_MAX,
+            ),
+        )
         
         for i in range(self.config.NUM_IMPOSTOR):
             # 冒充者使用新 Challenge

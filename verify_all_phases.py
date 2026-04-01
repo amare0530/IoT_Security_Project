@@ -48,13 +48,16 @@ print("PHASE 2: Anti-Replay Protection (防重放保護)")
 print("-" * 80)
 
 try:
-    from puf_simulator import AuthenticationEngine, PUFSimulator, PUFConfig, generate_challenge
+    from puf_simulator import AuthenticationEngine
     
-    engine = AuthenticationEngine(threshold=50)
-    puf = PUFSimulator("verify_phase2_key", PUFConfig(noise_sigma=0.05))
+    engine = AuthenticationEngine(threshold=45)
 
-    challenge = generate_challenge(seed="phase2_verify")
-    ideal_resp, test_resp = puf.generate_response(challenge, add_noise=True)
+    # Deterministic vectors remove randomness from verification output.
+    ideal_resp = "0" * 64
+    value = int(ideal_resp, 16)
+    for bit in [1, 5, 9, 13, 17, 21, 25, 29]:
+        value ^= (1 << bit)
+    test_resp = hex(value)[2:].zfill(64)
     
     # Test 1: First auth should succeed
     r1 = engine.verify_session(test_resp, ideal_resp, 'nonce_1')

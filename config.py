@@ -78,6 +78,21 @@ PUF_CONFIG = {
     "max_threshold": 256,           # 最大容錯門檻
 }
 
+# 研究預設：偏保守、貼近真實硬體（非理想 IID 雜訊）
+REALISTIC_PUF_PROFILE = {
+    "noise_sigma": 0.03,
+    "bias_ratio": 0.10,
+    "bias_strength": 0.90,
+    "unstable_ratio": 0.08,
+    "unstable_extra_noise": 0.08,
+    "cluster_noise_prob": 0.02,
+    "cluster_size": 4,
+    "env_noise_sigma": 0.005,
+    "env_spike_prob": 0.05,
+    "env_spike_min": 0.05,
+    "env_spike_max": 0.12,
+}
+
 # ═══════════════════════════════════════════════════════════════
 # 實驗參數設定
 # ═══════════════════════════════════════════════════════════════
@@ -179,6 +194,12 @@ def get_puf_config(key=None):
     if key:
         return PUF_CONFIG.get(key)
     return PUF_CONFIG
+
+def get_realistic_puf_profile(key=None):
+    """取得偏保守的現實噪聲配置，用於論文與壓測基線。"""
+    if key:
+        return REALISTIC_PUF_PROFILE.get(key)
+    return REALISTIC_PUF_PROFILE
 
 def validate_noise_level(noise):
     """驗證雜訊等級是否有效"""

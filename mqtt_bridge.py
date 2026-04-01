@@ -1,3 +1,17 @@
+"""
+MQTT bridge between Streamlit app and simulated IoT node.
+
+This process exists because `app.py` currently uses local JSON files for IPC
+instead of talking to MQTT directly:
+
+- Reads `challenge_out.json` written by `app.py`
+- Publishes challenge to MQTT topic
+- Receives response from MQTT topic
+- Writes `response_in.json` for `app.py`
+
+It also updates `bridge_status.json` as a heartbeat so UI can show bridge health.
+"""
+
 import json
 import os
 import time
@@ -83,6 +97,7 @@ def on_message(client, userdata, msg):
 
 
 def ensure_ipc_files():
+    """Create IPC files on startup so first read does not fail."""
     if not os.path.exists(OUT_FILE):
         with open(OUT_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f)
@@ -92,25 +107,11 @@ def ensure_ipc_files():
             json.dump({}, f)
 
 
-def connect_with_retry(client):
-    """連線失敗時持續重試，直到成功或被中斷。"""
-    while True:
-        try:
-            print(f"🔌 [Bridge] 正在連線 {BROKER}:{PORT} ...")
-            client.connect(BROKER, PORT, KEEPALIVE)
-            return
-        except KeyboardInterrupt:
-            raise
-        except Exception as e:
-            print(f"❌ [Bridge] 連線失敗: {e}，{CONNECT_RETRY_SECONDS} 秒後重試")
-            write_heartbeat(f"connect retry: {e}")
-            time.sleep(CONNECT_RETRY_SECONDS)
-
-
 client = mqtt.Client(client_id=f"IoT_Bridge_{int(time.time())}")
 client.on_connect = on_connect
 client.on_disconnect = on_disconnect
 client.on_message = on_message
+client.reconnect_delay_set(min_delay=1, max_delay=30)
 
 print("啟動 MQTT Bridge 服務中...")
 
@@ -118,17 +119,14 @@ try:
     ensure_ipc_files()
     write_heartbeat("starting")
 
-    connect_with_retry(client)
+    print(f"🔌 [Bridge] 正在連線 {BROKER}:{PORT} ...")
+    client.connect_async(BROKER, PORT, KEEPALIVE)
     client.loop_start()
     print("✅ [Bridge] MQTT 背景監聽已啟動")
 
-    # 輪詢檢測是否有新的 Challenge 需要發送
+    # Poll file-based command channel and forward only newer challenge events.
     while True:
         try:
-            # 若 MQTT 斷線則嘗試重連
-            if not bridge_connected:
-                connect_with_retry(client)
-
             if os.path.exists(IN_FILE):
                 with open(IN_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -141,6 +139,8 @@ try:
                             "challenge": data.get("challenge"),
                             "noise_level": data.get("noise_level", 3),
                             "timestamp": cmd_time,
+                            "nonce": data.get("nonce"),
+                            "max_response_time": data.get("max_response_time", 10),
                         }
                     )
 

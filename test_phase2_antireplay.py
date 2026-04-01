@@ -5,8 +5,15 @@ Phase 2: Anti-Replay Protection Test
 測試 Session-based Nonce 防重放功能
 """
 
-from puf_simulator import AuthenticationEngine, generate_challenge
-import hashlib
+from puf_simulator import AuthenticationEngine
+
+
+def flip_hex_bits(hex_str: str, bit_positions: list[int]) -> str:
+    """Flip selected bit positions in a fixed-width 256-bit hex string."""
+    value = int(hex_str, 16)
+    for pos in bit_positions:
+        value ^= (1 << pos)
+    return hex(value)[2:].zfill(64)
 
 def main():
     print('【Phase 2: Anti-Replay Protection - Test】')
@@ -15,10 +22,12 @@ def main():
     # Initialize engine
     engine = AuthenticationEngine(threshold=45)
 
-    # Generate test data
-    ideal_response = hashlib.sha256(b'test_challenge').hexdigest()
-    noisy_response_valid = hashlib.sha256(b'test_challenge_noisy_1').hexdigest()
-    noisy_response_invalid = hashlib.sha256(b'completely_different').hexdigest()
+    # Deterministic test vectors:
+    # - valid response differs by 8 bits (should pass under threshold=45)
+    # - invalid response differs by 96 bits (should fail)
+    ideal_response = "0" * 64
+    noisy_response_valid = flip_hex_bits(ideal_response, [1, 5, 9, 13, 17, 21, 25, 29])
+    noisy_response_invalid = flip_hex_bits(ideal_response, list(range(96)))
 
     # Test 1: Normal authentication with first nonce
     print('Test 1: First authentication with Nonce #1')
@@ -48,7 +57,16 @@ def main():
     print()
 
     print(f'Nonce cache size: {len(engine.used_nonces)} (expected 2: nonce_1, nonce_2)')
-    print('✅ Phase 2 Anti-Replay functionality verified!')
+
+    all_passed = (
+        result1["authenticated"] and
+        (not result2["authenticated"]) and
+        ("Replay Detected" in result2["reason"]) and
+        result3["authenticated"] and
+        (not result4["authenticated"]) and
+        len(engine.used_nonces) == 2
+    )
+    print(f'{"✅" if all_passed else "❌"} Phase 2 Anti-Replay functionality {"verified" if all_passed else "failed"}!')
     print()
     
     # Detailed output

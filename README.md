@@ -1,35 +1,24 @@
 ﻿# IoT Security Project
 
-PUF-based device authentication prototype for IoT.
+PUF-based IoT device authentication demo project.
 
-這個專案的目標很直接：
-- 用 PUF 行為模擬設備指紋
-- 用 Hamming Distance 做容錯認證
-- 用 Nonce + Timestamp 防重放
-- 用批次測試量化 FAR / FRR / EER
+本專案現在是「可重現實驗 + 展示」型態，不是 production service。
 
-目前是「可重現實驗」導向，不是成品服務。
+## 你應該先看哪裡
 
-## Why This Repo Exists
+如果你是 C++ 背景、Python 初學者，先看：
 
-大部分專題只做到「可以跑」。
-這個 repo 想回答的是：
-1. 在噪聲存在下，認證還能不能穩定？
-2. 閾值怎麼選，才不會只追求漂亮 EER？
-3. 防重放機制和 PUF 認證怎麼接在一起？
+1. `docs/guides/CPP_TO_PYTHON_QUICKSTART.md`
+2. `docs/guides/QUICKSTART.md`
+3. `app.py`, `node.py`, `mqtt_bridge.py`（三個核心執行檔）
 
-## Current Status
+## 系統架構（一句話版）
 
-- Dynamic Challenge: implemented
-- Session anti-replay (nonce cache): implemented
-- Timestamp validity window (default 60s): implemented
-- Batch metrics pipeline: implemented
-- EER scanning script: implemented
-- Security-first threshold discussion and audit notes: in progress
+- `app.py`：Streamlit UI + 認證判斷（Server 角色）
+- `mqtt_bridge.py`：把 UI 與 MQTT 裝置之間做檔案 IPC 橋接
+- `node.py`：模擬裝置端 PUF 回應
 
-## Quick Start
-
-### 1) Environment
+## 快速啟動（Windows）
 
 ```bash
 python -m venv .venv
@@ -37,112 +26,82 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2) Run the three core processes
+開三個 terminal：
 
-Terminal A:
+Terminal A
 ```bash
 python -m streamlit run app.py
 ```
 
-Terminal B:
-```bash
-python node.py
-```
-
-Terminal C:
+Terminal B
 ```bash
 python mqtt_bridge.py
 ```
 
-## Reproduce Core Experiments
-
-### Batch test
-
+Terminal C
 ```bash
-python batch_test.py
+python node.py
 ```
 
-Outputs:
-- artifacts/batch_test_results.csv
-- artifacts/batch_test_report.json
+## 檔案整理後的分類
 
-### ROC plot
+### A. 核心執行（先懂這些）
 
-```bash
-python plot_roc.py --json artifacts/batch_test_report.json --output artifacts/roc_curve.png
-```
+- `app.py`：Web UI、認證流程、SQLite 歷史紀錄
+- `mqtt_bridge.py`：MQTT <-> 本地檔案 IPC 橋接
+- `node.py`：模擬裝置端，收到 challenge 後生成 response
+- `puf_simulator.py`：PUF 與雜訊模型核心
 
-### EER scan
+### B. 實驗與分析腳本
 
-```bash
-python eer_scan.py
-```
+- `batch_test.py`：批次產生 genuine/impostor 資料
+- `eer_scan.py`：掃描 EER 與閾值區間
+- `plot_roc.py`：畫 ROC 曲線
+- `extreme_test.py`：極端環境測試
+- `sensitivity_analysis.py`：參數敏感度分析
+- `calibrate_from_real_data.py`：用實測資料校正參數
+- `run_5_scenarios.py`：一次跑 5 種場景
 
-Output:
-- artifacts/eer_analysis.txt
+### C. 驗證與測試
 
-### Extreme environment test
+- `test_phase2_antireplay.py`
+- `test_phase2_realistic.py`
+- `validate_phase1.py`
+- `validate_phase1_windows.py`
+- `verify_all_phases.py`
+- `mqtt_test.py`
 
-```bash
-python extreme_test.py
-```
+### D. 設定與 UI 輔助
 
-Output folder:
-- artifacts/extreme_env_test/
+- `config.py`：集中設定
+- `ui_theme.py`：Streamlit 主題樣式
 
-## Security Notes (Important)
+### E. 文件與產物
 
-這個專案目前有幾個需要誠實面對的點：
+- `docs/`：說明文件、檢查表、報告
+- `artifacts/`：執行輸出（報表/圖/稽核文檔）
 
-1. 只看 EER 會誤導安全決策
-- EER 是統計平衡，不是攻擊成本下界。
+## 主要產出檔
 
-2. 閾值過高會帶來明顯風險
-- 閾值需要配合 brute-force success probability 一起看。
+- `artifacts/batch_test_results.csv`
+- `artifacts/batch_test_report.json`
+- `artifacts/eer_analysis.txt`
+- `artifacts/extreme_env_test/environment_comparison.json`
 
-3. ECC / Helper Data 是「可靠性工具」，不是萬能安全工具
-- 如果 helper data 外洩，仍會影響有效熵。
+## 安全重點
 
-## Repository Layout
+1. Dynamic challenge + timestamp 檢查：限制重放窗口。
+2. Nonce cache：阻擋 session 內重放。
+3. HD threshold：是安全與可用性的權衡，不是越高越好。
 
-```text
-.
-├─ app.py
-├─ node.py
-├─ mqtt_bridge.py
-├─ puf_simulator.py
-├─ batch_test.py
-├─ plot_roc.py
-├─ sensitivity_analysis.py
-├─ extreme_test.py
-├─ eer_scan.py
-├─ calibrate_from_real_data.py
-├─ test_phase2_antireplay.py
-├─ test_phase2_realistic.py
-├─ verify_all_phases.py
-├─ artifacts/                  # generated outputs
-└─ docs/
-   ├─ guides/
-   ├─ phases/
-   ├─ reports/
-   └─ checklists/
-```
+## 已清理項目
 
-## Documentation Index
+- 移除一次性 patch 腳本：`patch_app.py`, `clean.py`, `do_part2.py`
 
-- docs/guides/QUICKSTART.md
-- docs/guides/MQTT_FIX_GUIDE.md
-- docs/phases/PHASE_2_QUICKSTART.md
-- docs/reports/TECHNICAL_REPORT.md
-- artifacts/README_ARCH.md
-- artifacts/security_audit_report.txt
+這三個檔案是歷史修補工具，不屬於正式系統流程。
 
-## Planned Next Steps
+## 下一步建議
 
-- Add strict security-threshold policy in scanning pipeline
-- Add cluster-noise + interleaving experiments
-- Upgrade helper-data path toward a more complete fuzzy extractor workflow
-
-## License
-
-No license file yet. If you plan to open-source formally, add one (MIT/Apache-2.0).
+1. 先完整跑一次 `verify_all_phases.py`。
+2. 再用 `batch_test.py` + `eer_scan.py` 做你要報告的閾值選擇依據。
+3. 若要口試展示，建議固定噪聲設定並預先產生 `artifacts/`。
