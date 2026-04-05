@@ -14,6 +14,8 @@ It also updates `bridge_status.json` as a heartbeat so UI can show bridge health
 
 import json
 import os
+import socket
+import sys
 import time
 
 import paho.mqtt.client as mqtt
@@ -33,6 +35,19 @@ HEARTBEAT_FILE = "bridge_status.json"
 
 last_challenge_time = 0
 bridge_connected = False
+_instance_lock_socket = None
+
+
+def enforce_single_instance(lock_port=45831):
+    """Prevent duplicate bridge processes that would race on IPC files."""
+    lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        lock_socket.bind(("127.0.0.1", lock_port))
+        lock_socket.listen(1)
+        return lock_socket
+    except OSError:
+        print("❌ [Bridge] 偵測到另一個 mqtt_bridge.py 已在執行，請先關閉重複實例")
+        sys.exit(1)
 
 
 def write_heartbeat(extra_message=""):
@@ -116,6 +131,7 @@ client.reconnect_delay_set(min_delay=1, max_delay=30)
 print("啟動 MQTT Bridge 服務中...")
 
 try:
+    _instance_lock_socket = enforce_single_instance()
     ensure_ipc_files()
     write_heartbeat("starting")
 
@@ -174,6 +190,11 @@ finally:
     try:
         client.loop_stop()
         client.disconnect()
+    except Exception:
+        pass
+    try:
+        if _instance_lock_socket:
+            _instance_lock_socket.close()
     except Exception:
         pass
     print("✅ [Bridge] 已結束")

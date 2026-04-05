@@ -18,6 +18,7 @@ IoT 硬體指紋認證系統 - MQTT 設備節點 (Node)
 import paho.mqtt.client as mqtt
 import json
 import random
+import socket
 import time
 import sys
 import traceback
@@ -35,6 +36,7 @@ DEVICE_ID = "FU_JEN_NODE_01"
 KEEPALIVE = 60
 MAX_RETRIES = 5
 RETRY_DELAY = 3  # 秒
+INSTANCE_LOCK_PORT = 45832
 
 # ═══════════════════════════════════════════════════════════════
 # 【PUF 模擬核心函數】
@@ -219,8 +221,18 @@ def main():
     # 初始化 MQTT 客戶端
     client = None
     retry_count = 0
+    lock_socket = None
     
     try:
+        # 防止重複啟動多個 node.py 造成回應混淆
+        lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            lock_socket.bind(("127.0.0.1", INSTANCE_LOCK_PORT))
+            lock_socket.listen(1)
+        except OSError:
+            print("❌ [Node] 偵測到另一個 node.py 已在執行，請先關閉重複實例")
+            sys.exit(1)
+
         client = mqtt.Client(
             client_id=f"{DEVICE_ID}_{int(time.time())}",
             clean_session=True
@@ -304,6 +316,11 @@ def main():
                 print("[Node] 已斷開連線")
             except Exception as e:
                 print(f"⚠️ [Node] 清理過程中出錯: {str(e)}")
+        if lock_socket:
+            try:
+                lock_socket.close()
+            except Exception:
+                pass
 
 # ═══════════════════════════════════════════════════════════════
 # 程式進入點

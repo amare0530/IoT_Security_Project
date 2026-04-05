@@ -526,6 +526,17 @@ def get_bridge_status():
     except Exception as e:
         return False, f"Bridge 狀態檔讀取失敗: {e}", None
 
+
+def get_bridge_heartbeat_snapshot():
+    """取得原始心跳資料，供 UI 顯示更細節的 Bridge 狀態。"""
+    if not os.path.exists(HEARTBEAT_FILE):
+        return None
+    try:
+        with open(HEARTBEAT_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
 def wait_for_latest_response(timeout_seconds=RESPONSE_WAIT_TIMEOUT, poll_interval=RESPONSE_POLL_INTERVAL):
     """在限定時間內輪詢 Response 檔案，避免單次讀取造成誤判。"""
     sent_time = st.session_state.get("challenge_sent_time", time.time())
@@ -648,9 +659,18 @@ st.markdown(
 )
 
 bridge_ok, bridge_msg, bridge_age = get_bridge_status()
+bridge_snapshot = get_bridge_heartbeat_snapshot()
 latest_resp, latest_resp_time = get_latest_response()
 latest_resp_age = (time.time() - latest_resp_time) if latest_resp_time else None
 history_count = get_auth_count()
+
+if bridge_snapshot:
+    hb_msg = bridge_snapshot.get("message", "n/a")
+    hb_broker = bridge_snapshot.get("broker", "n/a")
+    hb_age_text = f"{bridge_age:.1f}s" if bridge_age is not None else "n/a"
+    st.caption(f"Bridge 心跳: {hb_age_text} 前 | broker={hb_broker} | state={hb_msg}")
+else:
+    st.caption("Bridge 心跳: 尚未偵測到 bridge_status.json")
 
 status_cols = st.columns(4)
 with status_cols[0]:
@@ -725,6 +745,38 @@ with st.sidebar:
         st.success("已清空 response_in.json")
     if st.button("刷新 UI", use_container_width=True):
         st.rerun()
+
+    st.markdown("<div class='section-divider'></div>", unsafe_allow_html=True)
+    st.subheader("手動驗證（免腳本）")
+    with st.expander("查看手動檢查步驟", expanded=False):
+        st.markdown(
+            """
+1. 啟動 `mqtt_bridge.py`（只保留一個 Bridge 視窗）。
+2. 啟動 `node.py`（只保留一個 Node 視窗）。
+3. 在主頁確認 Bridge 狀態為正常，且心跳持續更新。
+4. 點擊「🚀 一鍵驗證」確認最近驗證有更新。
+5. 到「📊 歷史記錄」確認新紀錄已寫入 SQLite。
+            """
+        )
+
+    if st.button("執行手動檢查", use_container_width=True):
+        bridge_ok_now, bridge_msg_now, bridge_age_now = get_bridge_status()
+        latest_resp_now, latest_resp_time_now = get_latest_response()
+        auth_count_now = get_auth_count()
+
+        st.markdown("### 手動檢查結果")
+        if bridge_ok_now:
+            st.success(f"Bridge 正常：{bridge_msg_now}")
+        else:
+            age_txt = f"（心跳 age={bridge_age_now:.1f}s）" if bridge_age_now is not None else ""
+            st.error(f"Bridge 異常：{bridge_msg_now} {age_txt}")
+
+        if latest_resp_now is not None and latest_resp_time_now is not None:
+            st.success("已偵測到最新 Response 檔案")
+        else:
+            st.warning("尚未偵測到 Response，請先執行一次 Challenge 驗證")
+
+        st.info(f"目前歷史記錄共 {auth_count_now} 筆")
 
 
 def update_verification_state(verify_result, received_time):

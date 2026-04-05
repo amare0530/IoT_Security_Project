@@ -437,6 +437,25 @@ python node.py
 
 ---
 
+## 🧹 Git 提交前檢查（新增）
+
+每次提交前，先確保版本控制只包含「程式與文件」變更：
+
+- [ ] 執行 `git status --short`，確認沒有 `.venv/` 大量噪音變更
+- [ ] 本次提交只包含 source/docs（例如 `app.py`、`mqtt_bridge.py`、`node.py`、`docs/`）
+- [ ] 不提交本機執行期檔案（`bridge_status.json`、`challenge_out.json`、`response_in.json`、`authentication_history.db`）
+- [ ] 提交前再檢查一次 diff：`git diff --stat`
+- [ ] commit message 清楚描述本次目的（例如：`fix: enforce single instance for bridge/node`）
+
+建議流程：
+
+1. `git status --short`
+2. `git add <only-needed-files>`
+3. `git diff --cached --stat`
+4. `git commit -m "..."`
+
+---
+
 ## ✨ 最後檢查清單
 
 在 3/31 Demo 前：
