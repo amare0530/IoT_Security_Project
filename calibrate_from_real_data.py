@@ -1,4 +1,4 @@
-"""
+﻿"""
 Real-data calibration helper for PUFConfig.
 
 Goal:
@@ -126,3 +126,4 @@ def _demo() -> None:
 
 if __name__ == "__main__":
     _demo()
+

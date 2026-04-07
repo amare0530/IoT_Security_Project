@@ -1,4 +1,4 @@
-"""
+﻿"""
 ═══════════════════════════════════════════════════════════════════
 批量測試腳本 - Phase 2 數據生成
 Batch Test for FAR/FRR Analysis
@@ -163,7 +163,7 @@ class BatchTestExecutor:
                 print(f"   進度: {i+1}/{self.config.NUM_GENUINE} | "
                       f"最近 20 次平均 HD: {avg_hd:.2f}")
         
-        print(f"✅ 合法用戶測試完成")
+        print(f" 合法用戶測試完成")
         print(f"   總計: {len(self.genuine_hds)} 次")
         print(f"   平均 HD: {sum(self.genuine_hds)/len(self.genuine_hds):.2f}")
         print(f"   範圍: [{min(self.genuine_hds)}, {max(self.genuine_hds)}]")
@@ -235,7 +235,7 @@ class BatchTestExecutor:
                 print(f"   進度: {i+1}/{self.config.NUM_IMPOSTOR} | "
                       f"最近 20 次平均 HD: {avg_hd:.2f}")
         
-        print(f"✅ 冒充者測試完成")
+        print(f" 冒充者測試完成")
         print(f"   總計: {len(self.impostor_hds)} 次")
         print(f"   平均 HD: {sum(self.impostor_hds)/len(self.impostor_hds):.2f}")
         print(f"   範圍: [{min(self.impostor_hds)}, {max(self.impostor_hds)}]")
@@ -285,7 +285,7 @@ class BatchTestExecutor:
             for record in self.records:
                 writer.writerow(record.to_dict())
         
-        print(f"✅ 已匯出 CSV: {csv_path}")
+        print(f" 已匯出 CSV: {csv_path}")
         return csv_path
     
     def export_report(self, analysis_results: list):
@@ -323,7 +323,7 @@ class BatchTestExecutor:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ 已匯出 JSON: {json_path}")
+        print(f" 已匯出 JSON: {json_path}")
         return json_path
     
     @staticmethod
@@ -344,7 +344,7 @@ def main():
     """主測試流程"""
     
     print(f"\n{'='*70}")
-    print(f"🚀 Phase 2: 批量測試 - FAR/FRR 數據生成")
+    print(f" Phase 2: 批量測試 - FAR/FRR 數據生成")
     print(f"{'='*70}")
     print(f"開始時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"配置:")
@@ -374,15 +374,15 @@ def main():
     
     # 最終統計
     print(f"\n{'='*70}")
-    print(f"✅ 測試完成")
+    print(f" 測試完成")
     print(f"{'='*70}")
     print(f"執行時間:")
     print(f"  - 合法用戶測試: {genuine_time:.2f}s")
     print(f"  - 冒充者測試: {impostor_time:.2f}s")
     print(f"  - 總計: {genuine_time + impostor_time:.2f}s")
     print(f"\n輸出文件:")
-    print(f"  📊 CSV: {csv_path}")
-    print(f"  📋 JSON: {json_path}")
+    print(f"   CSV: {csv_path}")
+    print(f"   JSON: {json_path}")
     print(f"\n下一步:")
     print(f"  1. 用 Python/Excel 讀取 CSV，畫 ROC 曲線")
     print(f"  2. 調整 NOISE_SIGMA 進行敏感度分析")
@@ -392,3 +392,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

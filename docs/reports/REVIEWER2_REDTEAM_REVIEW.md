@@ -1,4 +1,4 @@
-# Reviewer #2 Red-Team Review (PUF + AuthenticationEngine)
+﻿# Reviewer #2 Red-Team Review (PUF + AuthenticationEngine)
 
 This document records adversarial findings and concrete fixes for the current codebase.
 The goal is not praise. The goal is to reduce hidden risk before thesis defense.
@@ -81,3 +81,5 @@ The goal is not praise. The goal is to reduce hidden risk before thesis defense.
   - `pa_hd`
   - Replay rejection rate
   - Tamper rejection rate
+
+

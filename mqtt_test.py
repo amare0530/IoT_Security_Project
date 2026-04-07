@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 ═══════════════════════════════════════════════════════════════════
 MQTT 連接診斷工具 - 測試 Server 和 Node 的雙向通信
@@ -40,10 +40,10 @@ def log(level, msg):
     """統一日誌格式"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     icons = {
-        "INFO": "ℹ️",
-        "SUCCESS": "✅",
-        "WARNING": "⚠️",
-        "ERROR": "❌",
+        "INFO": "",
+        "SUCCESS": "",
+        "WARNING": "",
+        "ERROR": "",
         "DEBUG": "🐛"
     }
     icon = icons.get(level, "•")
@@ -92,7 +92,7 @@ class MQTTTestClient:
     def on_message(self, client, userdata, msg):
         """接收訊息"""
         try:
-            log("INFO", f"📥 收到訊息 (主題: {msg.topic}, QoS: {msg.qos})")
+            log("INFO", f" 收到訊息 (主題: {msg.topic}, QoS: {msg.qos})")
             
             payload = json.loads(msg.payload.decode('utf-8'))
             log("SUCCESS", f"Response 已接收！Device ID: {payload.get('device_id')}")
@@ -157,7 +157,7 @@ class MQTTTestClient:
     
     def wait_for_response(self, timeout=15):
         """等待 Response"""
-        log("INFO", f"⏳ 等待 Node Response (超時: {timeout}秒)...")
+        log("INFO", f" 等待 Node Response (超時: {timeout}秒)...")
         start_time = time.time()
         
         while time.time() - start_time < timeout:
@@ -168,7 +168,7 @@ class MQTTTestClient:
             
             # 顯示進度
             elapsed = time.time() - start_time
-            print(f"\r⏳ 等待中 ({elapsed:.1f}s/{timeout}s)...", end="", flush=True)
+            print(f"\r 等待中 ({elapsed:.1f}s/{timeout}s)...", end="", flush=True)
             time.sleep(0.5)
         
         print()  # 換行
@@ -194,20 +194,20 @@ def generate_test_challenge():
 def print_summary():
     """列印測試總結"""
     print("\n" + "="*70)
-    print("📊 測試結果總結")
+    print(" 測試結果總結")
     print("="*70)
     
     result_lines = [
-        ("Broker 連接", "✅" if test_results["broker_connection"] else "❌"),
-        ("Challenge 已發送", "✅" if test_results["challenge_published"] else "❌"),
-        ("Response 已收到", "✅" if test_results["response_received"] else "❌"),
+        ("Broker 連接", "" if test_results["broker_connection"] else ""),
+        ("Challenge 已發送", "" if test_results["challenge_published"] else ""),
+        ("Response 已收到", "" if test_results["response_received"] else ""),
     ]
     
     for label, status in result_lines:
         print(f"{label:.<40} {status}")
     
     if test_results["errors"]:
-        print("\n❌ 發生的錯誤：")
+        print("\n 發生的錯誤：")
         for i, error in enumerate(test_results["errors"], 1):
             print(f"   {i}. {error}")
     
@@ -215,15 +215,15 @@ def print_summary():
     
     # 最終判定
     if test_results["response_received"]:
-        print("✅ 測試成功！MQTT 雙向通信運作正常。")
+        print(" 測試成功！MQTT 雙向通信運作正常。")
         print("可以放心使用 app.py 進行認證測試。\n")
         return 0
     elif test_results["broker_connection"] and test_results["challenge_published"]:
-        print("⚠️ 連接和發送成功，但未收到 Response。")
+        print(" 連接和發送成功，但未收到 Response。")
         print("請確保 Node 端正常運行 (python node.py)。\n")
         return 1
     else:
-        print("❌ 測試失敗。請檢查：")
+        print(" 測試失敗。請檢查：")
         print("1. 網路連線是否正常")
         print("2. Broker 地址是否正確 (broker.emqx.io:1883)")
         print("3. 防火牆是否阻擋連接\n")
@@ -233,7 +233,7 @@ def print_summary():
 def main():
     """主測試程式"""
     print("="*70)
-    print("🧪 MQTT 連接診斷工具")
+    print(" MQTT 連接診斷工具")
     print("="*70)
     print(f"Broker: {BROKER_HOST}:{BROKER_PORT}")
     print(f"Challenge 主題: {CHALLENGE_TOPIC}")
@@ -282,10 +282,11 @@ if __name__ == "__main__":
         exit_code = main()
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("\n\n⏹️ 測試被使用者中斷")
+        print("\n\n 測試被使用者中斷")
         sys.exit(1)
     except Exception as e:
         log("ERROR", f"未預期的錯誤: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(3)
+

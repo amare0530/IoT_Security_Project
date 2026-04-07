@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Phase 3: Extreme Environment Testing
@@ -55,7 +55,7 @@ def run_environment_test(noise_sigma: float, environment_name: str, config: Extr
       測試結果字典
     """
     print(f"\n{'='*70}")
-    print(f"🧪 Testing {environment_name} Environment (σ={noise_sigma})")
+    print(f" Testing {environment_name} Environment (σ={noise_sigma})")
     print(f"{'='*70}")
     
     # Setup
@@ -121,9 +121,9 @@ def run_environment_test(noise_sigma: float, environment_name: str, config: Extr
     
     # Print statistics
     print(f"\n【Statistics】")
-    print(f"✅ Genuine:  mean={genuine_mean:.2f}, std={genuine_std:.2f}, range=[{min(genuine_hds)}, {max(genuine_hds)}]")
-    print(f"❌ Impostor: mean={impostor_mean:.2f}, std={impostor_std:.2f}, range=[{min(impostor_hds)}, {max(impostor_hds)}]")
-    print(f"📊 Separation: {impostor_mean - genuine_mean:.2f} bits ({impostor_mean/genuine_mean:.2f}x)")
+    print(f" Genuine:  mean={genuine_mean:.2f}, std={genuine_std:.2f}, range=[{min(genuine_hds)}, {max(genuine_hds)}]")
+    print(f" Impostor: mean={impostor_mean:.2f}, std={impostor_std:.2f}, range=[{min(impostor_hds)}, {max(impostor_hds)}]")
+    print(f" Separation: {impostor_mean - genuine_mean:.2f} bits ({impostor_mean/genuine_mean:.2f}x)")
     
     result = {
         "environment": environment_name,
@@ -170,17 +170,17 @@ def generate_comparison_report(standard_result: Dict, extreme_result: Dict) -> D
     genuine_degradation = ((ext_genuine - std_genuine) / std_genuine) * 100
     impostor_degradation = ((ext_impostor - std_impostor) / std_impostor) * 100 if std_impostor > 0 else 0
     
-    print(f"\n📊 Genuine HD (合法用戶):")
+    print(f"\n Genuine HD (合法用戶):")
     print(f"  Standard: {std_genuine:.2f}")
     print(f"  Extreme:  {ext_genuine:.2f}")
     print(f"  Degradation: {genuine_degradation:+.1f}%")
     
-    print(f"\n📊 Impostor HD (冒充者):")
+    print(f"\n Impostor HD (冒充者):")
     print(f"  Standard: {std_impostor:.2f}")
     print(f"  Extreme:  {ext_impostor:.2f}")
     print(f"  Degradation: {impostor_degradation:+.1f}%")
     
-    print(f"\n📊 Separation:")
+    print(f"\n Separation:")
     print(f"  Standard: {(std_impostor - std_genuine):.2f} bits ({(std_impostor/std_genuine):.2f}x)")
     print(f"  Extreme:  {(ext_impostor - ext_genuine):.2f} bits ({(ext_impostor/ext_genuine):.2f}x)")
     
@@ -202,7 +202,7 @@ def generate_comparison_report(standard_result: Dict, extreme_result: Dict) -> D
         "system_resilience": "EXCELLENT" if genuine_degradation < 30 else "GOOD" if genuine_degradation < 50 else "FAIR"
     }
     
-    print(f"\n🛡️  System Resilience: {comparison['system_resilience']}")
+    print(f"\n  System Resilience: {comparison['system_resilience']}")
     
     return comparison
 
@@ -230,7 +230,7 @@ def main():
         # Remove raw data before saving
         result_to_save = {k: v for k, v in standard_result.items() if k not in ['genuine_hds', 'impostor_hds']}
         json.dump(result_to_save, f, indent=2, ensure_ascii=False)
-    print(f"\n✅ Saved: {config.OUTPUT_STANDARD}")
+    print(f"\n Saved: {config.OUTPUT_STANDARD}")
     
     # Test extreme environment
     extreme_result = run_environment_test(
@@ -243,16 +243,16 @@ def main():
     with open(config.OUTPUT_EXTREME, 'w', encoding='utf-8') as f:
         result_to_save = {k: v for k, v in extreme_result.items() if k not in ['genuine_hds', 'impostor_hds']}
         json.dump(result_to_save, f, indent=2, ensure_ascii=False)
-    print(f"✅ Saved: {config.OUTPUT_EXTREME}")
+    print(f" Saved: {config.OUTPUT_EXTREME}")
     
     # Generate comparison
     comparison = generate_comparison_report(standard_result, extreme_result)
     with open(config.OUTPUT_COMPARISON, 'w', encoding='utf-8') as f:
         json.dump(comparison, f, indent=2, ensure_ascii=False)
-    print(f"✅ Saved: {config.OUTPUT_COMPARISON}")
+    print(f" Saved: {config.OUTPUT_COMPARISON}")
     
     print(f"\n{'='*70}")
-    print("✅ Phase 3 Extreme Environment Testing Complete!")
+    print(" Phase 3 Extreme Environment Testing Complete!")
     print(f"{'='*70}")
     print(f"\nOutput files:")
     print(f"  📄 {config.OUTPUT_STANDARD}")
@@ -262,3 +262,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

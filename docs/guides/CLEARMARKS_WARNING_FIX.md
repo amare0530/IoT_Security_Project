@@ -1,4 +1,4 @@
-# mgt.clearMarks is not a function - Troubleshooting
+﻿# mgt.clearMarks is not a function - Troubleshooting
 
 This warning is a frontend runtime warning, not a Python logic failure.
 In this project it is typically triggered by the Streamlit web bundle running in a restricted WebView/browser context.
@@ -36,3 +36,5 @@ In this project it is typically triggered by the Streamlit web bundle running in
 - It is a JavaScript warning tied to performance marks cleanup in the frontend.
 - Core backend authentication logic still runs.
 - Treat it as a UI runtime compatibility warning unless it is accompanied by broken page rendering.
+
+

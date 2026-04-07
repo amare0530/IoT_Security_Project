@@ -1,4 +1,4 @@
-"""
+﻿"""
 EER 掃描工具
 - 讀取 artifacts/batch_test_report.json
 - 以 threshold 0..128 計算 FAR / FRR
@@ -111,3 +111,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

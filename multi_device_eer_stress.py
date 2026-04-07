@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Multi-device EER stress test with bootstrap confidence intervals.
@@ -196,3 +196,4 @@ if __name__ == "__main__":
     print(f"Recommended threshold (median): {report['recommended_threshold_median']}")
     print(f"Output JSON: {SUMMARY_JSON}")
     print(f"Output CSV:  {DEVICE_CSV}")
+

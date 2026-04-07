@@ -1,4 +1,4 @@
-"""
+﻿"""
 ═══════════════════════════════════════════════════════════════════
 敏感度分析工具 - 測試不同雜訊強度遞增的影響
 Sensitivity Analysis: Noise Level vs FAR/FRR
@@ -133,7 +133,7 @@ class SensitivityTestExecutor:
     def run_all_tests(self):
         """執行所有敏感度測試"""
         print(f"\n{'='*80}")
-        print(f"🧪 開始敏感度分析測試")
+        print(f" 開始敏感度分析測試")
         print(f"{'='*80}")
         print(f"配置:")
         print(f"  - 雜訊強度範圍: {self.config.NOISE_LEVELS}")
@@ -178,7 +178,7 @@ class SensitivityTestExecutor:
             print(f"    Accuracy: {avg_result['accuracy_avg']:.4f}, EER: {avg_result['EER_avg']:.4f}")
         
         print(f"\n{'='*80}")
-        print(f"✅ 所有敏感度測試完成")
+        print(f" 所有敏感度測試完成")
         print(f"{'='*80}\n")
     
     def export_results(self):
@@ -196,18 +196,18 @@ class SensitivityTestExecutor:
             writer.writeheader()
             writer.writerows(self.results)
         
-        print(f"✅ 已匯出 CSV: {self.config.OUTPUT_CSV}")
+        print(f" 已匯出 CSV: {self.config.OUTPUT_CSV}")
         
         # JSON
         with open(self.config.OUTPUT_JSON, 'w', encoding='utf-8') as f:
             json.dump(self.results, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ 已匯出 JSON: {self.config.OUTPUT_JSON}")
+        print(f" 已匯出 JSON: {self.config.OUTPUT_JSON}")
     
     def print_summary(self):
         """列印摘要"""
         print(f"\n{'='*80}")
-        print(f"📊 敏感度分析摘要")
+        print(f" 敏感度分析摘要")
         print(f"{'='*80}")
         print(f"{'σ (Noise)':<15} {'Separation':<15} {'Accuracy':<12} {'EER':<12} {'Eval'}")
         print(f"{'-'*80}")
@@ -220,13 +220,13 @@ class SensitivityTestExecutor:
             
             # 評級
             if sep > 50 and acc > 0.95:
-                eval_str = "⭐⭐⭐ 優秀"
+                eval_str = " 優秀"
             elif sep > 30 and acc > 0.90:
-                eval_str = "⭐⭐ 良好"
+                eval_str = " 良好"
             elif sep > 20 and acc > 0.80:
-                eval_str = "⭐ 可接受"
+                eval_str = " 可接受"
             else:
-                eval_str = "❌ 不可接受"
+                eval_str = " 不可接受"
             
             print(f"{sigma:<15.3f} {sep:<15.2f} {acc:<12.4f} {eer:<12.4f} {eval_str}")
         
@@ -277,3 +277,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

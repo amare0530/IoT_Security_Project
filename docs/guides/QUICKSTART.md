@@ -1,4 +1,4 @@
-# Quickstart (Windows)
+﻿# Quickstart (Windows)
 
 This guide is for running the project reliably on Windows.
 
@@ -62,3 +62,5 @@ Outputs are written to artifacts/.
 1. If you see mgt.clearMarks warnings, check docs/guides/CLEARMARKS_WARNING_FIX.md.
 2. If dependency install fails, ensure .venv was created by `py -3.11`.
 3. If UI has no response, confirm both mqtt_bridge.py and node.py are running.
+
+

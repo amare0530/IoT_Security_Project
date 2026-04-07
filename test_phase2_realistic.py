@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Phase 2: Anti-Replay Protection Test - Realistic Scenario
@@ -38,7 +38,7 @@ def main():
     print(f'  Authenticated: {result_1["authenticated"]}')
     
     if result_1["authenticated"]:
-        print(f'  ✅ Nonce cached: {len(auth_engine.used_nonces)} nonce(s)')
+        print(f'   Nonce cached: {len(auth_engine.used_nonces)} nonce(s)')
     print()
 
     # Test 2: Attacker tries replay with same challenge + response + nonce
@@ -48,7 +48,7 @@ def main():
     print(f'  Auth Result: {result_replay["reason"]}')
     print(f'  Authenticated: {result_replay["authenticated"]}')
     if "Replay" in result_replay["reason"]:
-        print(f'  ✅ REPLAY ATTACK BLOCKED!')
+        print(f'   REPLAY ATTACK BLOCKED!')
     print()
 
     # Test 3: Legitimate user authenticates again with new nonce
@@ -64,17 +64,17 @@ def main():
     print(f'  Auth Result: {result_2["reason"]}')
     print(f'  Authenticated: {result_2["authenticated"]}')
     if result_2["authenticated"]:
-        print(f'  ✅ New nonce accepted')
+        print(f'   New nonce accepted')
     print()
 
     # Summary
     print('='*70)
     print('SECURITY ANALYSIS SUMMARY:')
     print('='*70)
-    print(f'✅ Legitimate User Session 1: PASSED')
-    print(f'✅ Replay Attack Detection: {"PASSED" if not result_replay["authenticated"] else "FAILED"}')
-    print(f'✅ Legitimate User Session 2: PASSED')
-    print(f'✅ Nonce Cache Size: {len(auth_engine.used_nonces)} (should be 2)')
+    print(f' Legitimate User Session 1: PASSED')
+    print(f' Replay Attack Detection: {"PASSED" if not result_replay["authenticated"] else "FAILED"}')
+    print(f' Legitimate User Session 2: PASSED')
+    print(f' Nonce Cache Size: {len(auth_engine.used_nonces)} (should be 2)')
     print()
     print('Anti-Replay Mechanism:')
     print(f'  - Each session requires a unique Nonce')
@@ -85,3 +85,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

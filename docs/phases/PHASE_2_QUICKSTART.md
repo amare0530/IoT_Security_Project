@@ -1,6 +1,6 @@
-# 🚀 Phase 2 執行指南 - 高斯雜訊與實驗數據量化
+﻿#  Phase 2 執行指南 - 高斯雜訊與實驗數據量化
 
-## 📋 快速開始
+##  快速開始
 
 ### 工具清單
 
@@ -13,7 +13,7 @@
 
 ---
 
-## 🎯 快速執行流程
+##  快速執行流程
 
 ### Step 1: 執行 200 次批量測試
 
@@ -23,15 +23,15 @@ python batch_test.py
 
 **預期輸出**:
 ```
-✅ 合法用戶測試完成: 平均 HD = 24.50 bits
-✅ 冒充者測試完成: 平均 HD = 127.59 bits
-✅ 已匯出 CSV: artifacts/batch_test_results.csv
-✅ 已匯出 JSON: artifacts/batch_test_report.json
+ 合法用戶測試完成: 平均 HD = 24.50 bits
+ 冒充者測試完成: 平均 HD = 127.59 bits
+ 已匯出 CSV: artifacts/batch_test_results.csv
+ 已匯出 JSON: artifacts/batch_test_report.json
 ```
 
 **產生的文件**:
-- 📊 `artifacts/batch_test_results.csv`: 200 行完整測試記錄
-- 📋 `artifacts/batch_test_report.json`: 統計數據 + ROC 曲線點
+-  `artifacts/batch_test_results.csv`: 200 行完整測試記錄
+-  `artifacts/batch_test_report.json`: 統計數據 + ROC 曲線點
 
 ---
 
@@ -50,10 +50,10 @@ python plot_roc.py --output my_roc.png
 
 **預期輸出**:
 ```
-✅ 分離度: 103.09 bits (⭐⭐⭐ 優秀)
-✅ EER: 0.0000
-✅ 最佳閾值: 40 (Accuracy 100%)
-✅ 已保存圖表: artifacts/roc_curve.png
+ 分離度: 103.09 bits ( 優秀)
+ EER: 0.0000
+ 最佳閾值: 40 (Accuracy 100%)
+ 已保存圖表: artifacts/roc_curve.png
 ```
 
 **產生的文件**:
@@ -71,23 +71,23 @@ python sensitivity_analysis.py
 
 **預期輸出**:
 ```
-🧪 開始敏感度分析測試
+ 開始敏感度分析測試
   - 雜訊強度範圍: [0.01, 0.03, 0.05, 0.08, 0.10, 0.15, 0.20]
   - 每個雜訊強度重複: 5 次
   - 單次測試規模: 100 genuine + 100 impostor
 
-✅ 最優雜訊強度: σ = 0.05
+ 最優雜訊強度: σ = 0.05
    此時精度: 0.9950
    精度 > 90% 的最大雜訊: σ = 0.10
 ```
 
 **產生的文件**:
-- 📊 `artifacts/sensitivity_analysis.csv`: 敏感度分析結果
-- 📋 `artifacts/sensitivity_analysis.json`: 詳細數據
+-  `artifacts/sensitivity_analysis.csv`: 敏感度分析結果
+-  `artifacts/sensitivity_analysis.json`: 詳細數據
 
 ---
 
-## 📊 如何使用生成的數據
+##  如何使用生成的數據
 
 ### 用 CSV 畫圖 (Python + Matplotlib)
 
@@ -135,7 +135,7 @@ for point in report['roc_curve_data']:
 
 ---
 
-## 🔧 自訂參數
+##  自訂參數
 
 ### 修改雜訊強度
 
@@ -169,11 +169,11 @@ class SensitivityTestConfig:
 
 | 指標 | 目標 | 你的結果 |
 |-----|------|---------|
-| **分離度** | > 50 bits | ✅ 103.09 bits |
-| **Genuine HD 分佈寬度** | σ < 10 | ✅ σ = 4.84 |
-| **Impostor HD 平均值** | = 128 (隨機) | ✅ 127.59 bits |
-| **EER (最低錯誤率)** | < 0.05 | ✅ 0.0000 |
-| **最佳 Accuracy** | > 0.95 | ✅ 0.9950 ~ 1.0000 |
+| **分離度** | > 50 bits |  103.09 bits |
+| **Genuine HD 分佈寬度** | σ < 10 |  σ = 4.84 |
+| **Impostor HD 平均值** | = 128 (隨機) |  127.59 bits |
+| **EER (最低錯誤率)** | < 0.05 |  0.0000 |
+| **最佳 Accuracy** | > 0.95 |  0.9950 ~ 1.0000 |
 
 ---
 
@@ -266,7 +266,7 @@ IoT_Security_Project/
 
 ---
 
-## 🎯 學習檢查清單
+##  學習檢查清單
 
 在繼續下一個 Phase 之前，請確認你理解以下概念：
 
@@ -302,4 +302,6 @@ IoT_Security_Project/
 
 ---
 
-**祝你 Phase 2 順利！這些實驗結果會是你向老師展示項目深度的有力證據。** 🚀
+**祝你 Phase 2 順利！這些實驗結果會是你向老師展示項目深度的有力證據。** 
+
+

@@ -1,12 +1,12 @@
-"""
+﻿"""
 程式註解加強版本 - 核心函式詳細說明
 此檔案示範 app.py 與 node.py 中較複雜函式的詳細註解方式
 
 重點關注：
-  ✅ Hamming Distance 計算的逐行說明
-  ✅ VRF Challenge 生成的密碼學細節
-  ✅ 位元翻轉的二進位邏輯
-  ✅ MQTT 異常處理的層級結構
+   Hamming Distance 計算的逐行說明
+   VRF Challenge 生成的密碼學細節
+   位元翻轉的二進位邏輯
+   MQTT 異常處理的層級結構
 """
 
 import hashlib
@@ -112,12 +112,12 @@ def calculate_hamming_distance_ANNOTATED(s1, s2):
         
     except ValueError as e:
         # 捕獲驗證階段的錯誤（格式錯誤、空值等）
-        print(f"❌ Hex 格式錯誤: {str(e)}")
+        print(f" Hex 格式錯誤: {str(e)}")
         return None
     
     except Exception as e:
         # 捕獲未預期的其他錯誤（例如記憶體不足）
-        print(f"❌ 計算漢明距離時發生錯誤: {str(e)}")
+        print(f" 計算漢明距離時發生錯誤: {str(e)}")
         return None
 
 
@@ -237,9 +237,9 @@ def generate_vrf_challenge_ANNOTATED(private_key, seed):
         #   收到: (Challenge_recv, Proof_recv)
         #   計算: Proof_expected = SHA256(Challenge_recv || 私鑰)[0:20]
         #   比較: if Proof_expected == Proof_recv:
-        #            ✅ Challenge 合法
+        #             Challenge 合法
         #         else:
-        #            ❌ Challenge 被竄改
+        #             Challenge 被竄改
         
         proof = hashlib.sha256(
             (c + private_key).encode()  # 串接 Challenge 和私鑰
@@ -254,7 +254,7 @@ def generate_vrf_challenge_ANNOTATED(private_key, seed):
         
     except Exception as e:
         # 捕獲生成過程中任何錯誤
-        print(f"❌ VRF 生成失敗: {str(e)}")
+        print(f" VRF 生成失敗: {str(e)}")
         return None, None
 
 
@@ -346,9 +346,9 @@ def simulate_puf_response_ANNOTATED(challenge_hex, noise_level=3):
     
     認證判定：
       if HD ≤ Threshold:
-          ✅ 認證通過（設備特徵相符）
+           認證通過（設備特徵相符）
       else:
-          ❌ 認證失敗（特徵差異過大）
+           認證失敗（特徵差異過大）
     """
     
     try:
@@ -462,12 +462,12 @@ def simulate_puf_response_ANNOTATED(challenge_hex, noise_level=3):
         
     except ValueError as e:
         # 捕獲驗證階段的錯誤
-        print(f"❌ [PUF] 驗證錯誤: {str(e)}")
+        print(f" [PUF] 驗證錯誤: {str(e)}")
         return None
     
     except Exception as e:
         # 捕獲未預期的錯誤（例如記憶體不足）
-        print(f"❌ [PUF] 未預期的錯誤: {str(e)}")
+        print(f" [PUF] 未預期的錯誤: {str(e)}")
         return None
 
 
@@ -604,3 +604,4 @@ print("\n" + "=" * 70)
 print("說明: 本文件為代碼註釋示意版")
 print("完整版請參考 app.py 和 node.py")
 print("=" * 70)
+

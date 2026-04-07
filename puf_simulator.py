@@ -1,15 +1,15 @@
-"""
+﻿"""
 ═══════════════════════════════════════════════════════════════════
 PUF 模擬器 - 高斯雜訊模型版本
 Phase 2: 科學化的實驗數據生成
 ═══════════════════════════════════════════════════════════════════
 
 改進點：
-  ✅ 高斯雜訊模型 (Gaussian Noise Model)
-  ✅ 機率驅動的位元翻轉 (Probabilistic Bit Flip)
-  ✅ 可調整的雜訊強度參數 (σ = 0.01 ~ 0.20)
-  ✅ 真實硬體統計模擬
-  ✅ 時間變異性支持
+   高斯雜訊模型 (Gaussian Noise Model)
+   機率驅動的位元翻轉 (Probabilistic Bit Flip)
+   可調整的雜訊強度參數 (σ = 0.01 ~ 0.20)
+   真實硬體統計模擬
+   時間變異性支持
 
 原理：
   在真實硬體 (SRAM PUF, RO-PUF) 中，PUF 回應不是完全確定的。
@@ -62,7 +62,7 @@ class PUFConfig:
           response_bits: PUF 回應位寬 (通常 256 bit)
           noise_sigma: 雜訊標準差 (σ), 範圍 0.01 ~ 0.20
                       - 0.01 = 1% 位元翻轉 (低雜訊)
-                      - 0.05 = 5% 位元翻轉 (中等雜訊) ⭐ 推薦
+                      - 0.05 = 5% 位元翻轉 (中等雜訊)  推薦
                       - 0.10 = 10% 位元翻轉 (高雜訊)
                       - 0.20 = 20% 位元翻轉 (極端雜訊)
           
@@ -864,26 +864,27 @@ def generate_challenge(
 def print_stats(records: list, label: str = ""):
     """列印統計數據"""
     print(f"\n{'='*70}")
-    print(f"📊 統計數據 {label}")
+    print(f" 統計數據 {label}")
     print(f"{'='*70}")
     
     if not records:
-        print("❌ 沒有記錄")
+        print(" 沒有記錄")
         return
     
     genuine_hds = [r.hamming_distance for r in records if r.test_type == "genuine"]
     impostor_hds = [r.hamming_distance for r in records if r.test_type == "impostor"]
     
     if genuine_hds:
-        print(f"✅ 合法用戶 (Genuine):")
+        print(f" 合法用戶 (Genuine):")
         print(f"   計數: {len(genuine_hds)}")
         print(f"   HD 平均值: {sum(genuine_hds)/len(genuine_hds):.2f}")
         print(f"   HD 範圍: [{min(genuine_hds)}, {max(genuine_hds)}]")
     
     if impostor_hds:
-        print(f"❌ 冒充者 (Impostor):")
+        print(f" 冒充者 (Impostor):")
         print(f"   計數: {len(impostor_hds)}")
         print(f"   HD 平均值: {sum(impostor_hds)/len(impostor_hds):.2f}")
         print(f"   HD 範圍: [{min(impostor_hds)}, {max(impostor_hds)}]")
     
     print(f"{'='*70}\n")
+

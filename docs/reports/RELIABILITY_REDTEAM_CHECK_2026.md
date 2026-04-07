@@ -1,4 +1,4 @@
-# Reliability Red-Team Check (2026-04-01)
+﻿# Reliability Red-Team Check (2026-04-01)
 
 This report validates the threshold calibration with a reliability-first mindset.
 It focuses on worst-case risk rather than average-case success.
@@ -74,3 +74,5 @@ Use this claim format:
 - Summary JSON: artifacts/hd_distribution_summary.json
 - Raw samples: artifacts/hd_distribution_samples.csv
 - Distribution figure: artifacts/hd_distribution_hist.png
+
+

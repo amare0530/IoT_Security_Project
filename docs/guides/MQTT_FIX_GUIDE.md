@@ -1,4 +1,4 @@
-﻿## 🔧 MQTT 無回應修復指南（Bridge 架構）
+﻿##  MQTT 無回應修復指南（Bridge 架構）
 
 本專案目前採用三程序架構：
 1. Streamlit 伺服器：app.py
@@ -58,7 +58,7 @@ streamlit run app.py
 
 ---
 
-## 🧪 建議驗證流程
+##  建議驗證流程
 
 1. 在 UI 點擊「生成新挑戰碼」。
 2. 點擊「發送至 Node 端」。
@@ -97,7 +97,7 @@ streamlit run app.py
 
 ---
 
-## 📌 架構說明（目前版本）
+##  架構說明（目前版本）
 
 資料流：
 1. app.py 寫入 challenge_out.json
@@ -110,7 +110,7 @@ streamlit run app.py
 
 ---
 
-## 🛠 後續重構建議
+##  後續重構建議
 
 若要完全消除檔案輪詢時序問題，可進行第二階段重構：
 1. app.py 改為直接 MQTT publish/subscribe。
@@ -125,5 +125,7 @@ streamlit run app.py
 - 已將 Bridge 與 Node 的重複啟動風險納入說明。
 - 已新增 UI 內建手動驗證流程，方便不使用外部腳本時仍可檢查系統健康狀態。
 - 已補上建議操作順序：先單一 Node、單一 Bridge，再開 app.py。
+
+
 
 

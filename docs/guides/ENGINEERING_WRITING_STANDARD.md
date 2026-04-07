@@ -1,4 +1,4 @@
-# Engineering Writing Standard (Human Style)
+﻿# Engineering Writing Standard (Human Style)
 
 This file defines how future code and docs should look in this repository.
 Use this as a hard rule for all expansions.
@@ -65,3 +65,5 @@ When changing security behavior, update at least one report under `docs/reports`
 - what changed
 - what remains unproven
 - how to reproduce results
+
+

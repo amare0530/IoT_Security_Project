@@ -1,4 +1,4 @@
-# IoT PUF Security System - Three-Phase Enhancement Complete ✅
+﻿# IoT PUF Security System - Three-Phase Enhancement Complete 
 
 **Status**: Production-Ready | Graduate Presentation Material | Security Validated
 
@@ -16,7 +16,7 @@ The system progresses from a basic "random simulator" to a **production-grade, s
 
 ---
 
-## Phase 1: Physical Layer Enhancement 🔧
+## Phase 1: Physical Layer Enhancement 
 
 ### Problem Solved
 Original PUF simulator had too-perfect output (EER ≈ 0%), not matching real hardware behavior.
@@ -47,13 +47,13 @@ When bias is strong, other sources have less relative impact.
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Genuine User HD** | 49.12 bits | ✅ Target (40-50) |
-| **Impostor HD** | 129.26 bits | ✅ High separation |
-| **Separability** | 2.63x | ⭐⭐⭐ Excellent |
-| **FAR @ threshold 45** | 0% | ✅ No false accepts |
-| **FRR @ threshold 45** | 35% | ✅ Acceptable |
-| **EER** | ~17.5% | ✅ Reasonable |
-| **ROC Accuracy** | 82.5% | ✅ Good performance |
+| **Genuine User HD** | 49.12 bits |  Target (40-50) |
+| **Impostor HD** | 129.26 bits |  High separation |
+| **Separability** | 2.63x |  Excellent |
+| **FAR @ threshold 45** | 0% |  No false accepts |
+| **FRR @ threshold 45** | 35% |  Acceptable |
+| **EER** | ~17.5% |  Reasonable |
+| **ROC Accuracy** | 82.5% |  Good performance |
 
 ### ROC Curve Output
 Generated: `artifacts/roc_phase1.png`
@@ -63,7 +63,7 @@ Generated: `artifacts/roc_phase1.png`
 
 ---
 
-## Phase 2: Anti-Replay Protection 🛡️
+## Phase 2: Anti-Replay Protection 
 
 ### Problem Solved
 Real-world PUF systems vulnerable to **replay attacks**: attacker intercepts a valid `(Challenge, Response)` pair and replays it later to bypass authentication.
@@ -100,7 +100,7 @@ Timeline:
 4. [ATTACKER INTERCEPTS #3]
 
 5. Attacker: Replays "PUF Response + Nonce N1" → Server
-6. Server: Checks nonce cache → "N1 already used!" ❌ Auth Failed
+6. Server: Checks nonce cache → "N1 already used!"  Auth Failed
 
 Result: Replay attack BLOCKED even with correct PUF response
 ```
@@ -108,10 +108,10 @@ Result: Replay attack BLOCKED even with correct PUF response
 ### Test Results
 
 ```
-✅ Session 1: New nonce → Auth Success
-✅ Replay Attack: Same nonce → "Auth Failed (Replay Detected)" ← BLOCKED
-✅ Session 2: Different nonce → Auth Success  
-✅ Nonce Cache: 2 entries (n1, n2)
+ Session 1: New nonce → Auth Success
+ Replay Attack: Same nonce → "Auth Failed (Replay Detected)" ← BLOCKED
+ Session 2: Different nonce → Auth Success  
+ Nonce Cache: 2 entries (n1, n2)
 ```
 
 Test files:
@@ -152,11 +152,11 @@ System Resilience Assessment: GOOD
 
 ### Security Interpretation
 
-✅ **Impostors remain detectable**: Even at 3x noise, impostor HD (128) is far above genuine ceiling (75)
+ **Impostors remain detectable**: Even at 3x noise, impostor HD (128) is far above genuine ceiling (75)
 
-✅ **Genuine users suffer acceptable degradation**: 49% increase in HD is expected and can be compensated with threshold adjustment
+ **Genuine users suffer acceptable degradation**: 49% increase in HD is expected and can be compensated with threshold adjustment
 
-✅ **Production deployment**: System passes stress test for IoT deployment
+ **Production deployment**: System passes stress test for IoT deployment
 
 ### Output Files
 
@@ -256,11 +256,11 @@ IoT_Security_Project/
 
 | System Component | Status | Validation |
 |-----------------|--------|-----------|
-| **PUF Realism** | ✅ Phase 1 | Bias bits (10%) match SRAM behavior |
-| **Security** | ✅ Phase 2 | Anti-replay via nonces tested & working |
-| **Robustness** | ✅ Phase 3 | 82% performance under 3x noise |
-| **Attack Resilience** | ✅ Complete | FAR=0%, Replay=Blocked, Impostor HD=128 |
-| **Code Quality** | ✅ Verified | 0 syntax errors, all tests passing |
+| **PUF Realism** |  Phase 1 | Bias bits (10%) match SRAM behavior |
+| **Security** |  Phase 2 | Anti-replay via nonces tested & working |
+| **Robustness** |  Phase 3 | 82% performance under 3x noise |
+| **Attack Resilience** |  Complete | FAR=0%, Replay=Blocked, Impostor HD=128 |
+| **Code Quality** |  Verified | 0 syntax errors, all tests passing |
 
 ---
 
@@ -305,3 +305,5 @@ For questions or technical details, refer to:
 *Project Status: PRODUCTION READY*  
 *Last Updated: 2026-03-31*  
 *Implemented by: Modular Enhancement Protocol*
+
+

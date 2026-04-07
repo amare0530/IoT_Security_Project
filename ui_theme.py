@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 
 
 def inject_theme() -> None:
@@ -94,3 +94,4 @@ def render_status_badge(label: str, value: str, is_ok: bool, detail: str = "") -
         f"{detail_html}"
         f"</div>"
     )
+

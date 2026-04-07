@@ -1,4 +1,4 @@
-# Literature + GitHub Baseline Comparison (2026)
+﻿# Literature + GitHub Baseline Comparison (2026)
 
 This note is written for thesis defense and red-team style review.
 It focuses on two questions:
@@ -207,3 +207,5 @@ Not all repositories implement the same full stack, so we compare by capability 
 1. It separates reliability, integrity, and entropy stages explicitly in code.
 2. It provides adversarial outcomes (`tampered`, `replay`, `expired`) instead of only pass/fail.
 3. It evaluates realistic noise with cross-device confidence intervals instead of one-device ideal simulation.
+
+

@@ -1,4 +1,4 @@
-"""
+﻿"""
 配置文件 - IoT 硬體指紋認證系統
 =================================
 
@@ -119,7 +119,7 @@ EXPERIMENT_CONFIG = {
 UI_CONFIG = {
     # Streamlit 頁面設定
     "page_title": "IoT 安全驗證系統",
-    "page_icon": "🔒",
+    "page_icon": "",
     "layout": "wide",               # 使用寬版式
     
     # 時間相關顯示
@@ -217,7 +217,7 @@ def validate_threshold(threshold):
 
 if __name__ == "__main__":
     # 使用範例
-    print("📋 IoT Security Configuration")
+    print(" IoT Security Configuration")
     print("=" * 60)
     
     # 取得 MQTT 配置
@@ -240,3 +240,4 @@ if __name__ == "__main__":
     print(f"\nValidation:")
     print(f"Noise 3 bits valid? {validate_noise_level(3)}")
     print(f"Threshold 5 valid? {validate_threshold(5)}")
+

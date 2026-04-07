@@ -1,4 +1,4 @@
-"""
+﻿"""
 ═══════════════════════════════════════════════════════════════════
 ROC 曲線與 EER 分析工具
 ROC Curve & Equal Error Rate (EER) Visualization
@@ -47,7 +47,7 @@ try:
     HAS_MATPLOTLIB = True
 except ImportError:
     HAS_MATPLOTLIB = False
-    print("⚠️  警告: matplotlib 未安裝")
+    print("  警告: matplotlib 未安裝")
     print("   執行: pip install matplotlib")
 
 
@@ -79,12 +79,12 @@ class ROCAnalyzer:
         try:
             with open(self.json_path, 'r', encoding='utf-8') as f:
                 self.report = json.load(f)
-            print(f"✅ 已讀取報表: {self.json_path}")
+            print(f" 已讀取報表: {self.json_path}")
         except FileNotFoundError:
-            print(f"❌ 找不到報表文件: {self.json_path}")
+            print(f" 找不到報表文件: {self.json_path}")
             sys.exit(1)
         except json.JSONDecodeError:
-            print(f"❌ JSON 解析失敗: {self.json_path}")
+            print(f" JSON 解析失敗: {self.json_path}")
             sys.exit(1)
     
     def extract_roc_points(self) -> List[Dict]:
@@ -111,7 +111,7 @@ class ROCAnalyzer:
                 "accuracy": float(point["accuracy"])
             })
         
-        print(f"✅ 提取 {len(self.roc_points)} 個 ROC 數據點")
+        print(f" 提取 {len(self.roc_points)} 個 ROC 數據點")
         return self.roc_points
     
     def find_eer(self) -> Dict:
@@ -135,7 +135,7 @@ class ROCAnalyzer:
         self.eer_point = eer_point
         
         if eer_point:
-            print(f"✅ EER 點:")
+            print(f" EER 點:")
             print(f"   Threshold: {eer_point['threshold']}")
             print(f"   FAR: {eer_point['FAR']:.4f}")
             print(f"   FRR: {eer_point['FRR']:.4f}")
@@ -165,7 +165,7 @@ class ROCAnalyzer:
         
         self.best_threshold = best
         
-        print(f"✅ 最佳閾值 (基於 {metric}):")
+        print(f" 最佳閾值 (基於 {metric}):")
         print(f"   Threshold: {best['threshold']}")
         print(f"   FAR: {best['FAR']:.4f}")
         print(f"   FRR: {best['FRR']:.4f}")
@@ -183,15 +183,15 @@ class ROCAnalyzer:
         impostor = stats.get("impostor", {})
         
         print(f"\n{'='*70}")
-        print(f"📊 測試統計")
+        print(f" 測試統計")
         print(f"{'='*70}")
-        print(f"✅ 合法用戶 (Genuine):")
+        print(f" 合法用戶 (Genuine):")
         print(f"   計數: {genuine.get('count', 0)}")
         print(f"   平均 HD: {genuine.get('mean_hd', 0):.2f}")
         print(f"   標準差: {genuine.get('std_dev', 0):.2f}")
         print(f"   範圍: [{genuine.get('min_hd', 0)}, {genuine.get('max_hd', 0)}]")
         
-        print(f"\n❌ 冒充者 (Impostor):")
+        print(f"\n 冒充者 (Impostor):")
         print(f"   計數: {impostor.get('count', 0)}")
         print(f"   平均 HD: {impostor.get('mean_hd', 0):.2f}")
         print(f"   標準差: {impostor.get('std_dev', 0):.2f}")
@@ -204,11 +204,11 @@ class ROCAnalyzer:
         print(f"   HD 差: {separation:.2f} bits")
         print(f"   倍數: {impostor_mean/genuine_mean:.2f}x")
         if separation > 50:
-            print(f"   評級: ⭐⭐⭐ 優秀 (分離度 > 50)")
+            print(f"   評級:  優秀 (分離度 > 50)")
         elif separation > 20:
-            print(f"   評級: ⭐⭐ 良好 (分離度 > 20)")
+            print(f"   評級:  良好 (分離度 > 20)")
         else:
-            print(f"   評級: ⭐ 一般 (分離度 < 20)")
+            print(f"   評級:  一般 (分離度 < 20)")
         
         print(f"{'='*70}\n")
 
@@ -226,7 +226,7 @@ def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = os.path.join("artif
       output_path: 輸出圖片路徑
     """
     if not HAS_MATPLOTLIB:
-        print("⚠️  無法繪製圖表（matplotlib 未安裝）")
+        print("  無法繪製圖表（matplotlib 未安裝）")
         print("   執行: pip install matplotlib")
         return
     
@@ -296,7 +296,7 @@ def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = os.path.join("artif
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"✅ 已保存圖表: {output_path}")
+    print(f" 已保存圖表: {output_path}")
     
     return fig
 
@@ -304,7 +304,7 @@ def plot_roc_curve(analyzer: ROCAnalyzer, output_path: str = os.path.join("artif
 def print_roc_table(analyzer: ROCAnalyzer):
     """列印 ROC 數據表"""
     print(f"\n{'='*70}")
-    print(f"📊 ROC 曲線數據表")
+    print(f" ROC 曲線數據表")
     print(f"{'='*70}")
     print(f"{'Threshold':<12} {'FAR':<12} {'FRR':<12} {'1-FRR':<12} {'Accuracy':<12}")
     print(f"{'-'*70}")
@@ -378,9 +378,10 @@ def main():
             plt.show()
     
     print(f"\n{'='*70}")
-    print(f"✅ 分析完成")
+    print(f" 分析完成")
     print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
     main()
+

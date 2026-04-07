@@ -1,30 +1,30 @@
-# 🔐 動態 Seed 防禦設計 (Dynamic Seed Generation & Replay Attack Prevention)
+﻿#  動態 Seed 防禦設計 (Dynamic Seed Generation & Replay Attack Prevention)
 
-## 📋 目前問題診斷
+##  目前問題診斷
 
-### ❌ 現有漏洞
+###  現有漏洞
 ```python
 # 【舊實現】 - 靜態 Seed（不安全）
-default_seed = "CRP_INDEX_001"  # 👈 固定不變，容易被記錄和重放
+default_seed = "CRP_INDEX_001"  #  固定不變，容易被記錄和重放
 
 Challenge = VRF(SK, seed)
 # 攻擊者可以：
 # 1. 截獲 Challenge_001
 # 2. 記錄下來
 # 3. 一小時後，用同樣的 Challenge 再次嘗試
-# → 若 Response 未改變 → 認證通過 (REPLAY ATTACK! ❌)
+# → 若 Response 未改變 → 認證通過 (REPLAY ATTACK! )
 ```
 
-### ⚠️ 安全威脅
+###  安全威脅
 - **Replay Attack**: 攻擊者重複使用舊的有效 Challenge-Response 對
 - **Seed 可預測**: 固定種子下，Challenge 永遠相同
 - **無時間限制**: Server 無法驗證 Response 是「新鮮」還是「陳舊」
 
 ---
 
-## ✅ 解決方案：動態 Seed + 時間窗口驗證
+##  解決方案：動態 Seed + 時間窗口驗證
 
-### 🎯 核心設計原則
+###  核心設計原則
 
 ```
 動態 Seed = f(Timestamp, Nonce, 伺服器秘鑰)
@@ -41,7 +41,7 @@ Challenge = VRF(SK, seed)
 
 ---
 
-## 🔧 詳細實現方案
+##  詳細實現方案
 
 ### 1️⃣ Seed 生成邏輯 (Server 側)
 
@@ -160,8 +160,8 @@ def generate_challenge_with_dynamic_seed(config: dict) -> dict:
     # 【Step 4】打包 Challenge JSON (包含時間戳記資訊)
     challenge_payload = {
         "challenge": challenge_hex,
-        "timestamp": timestamp,           # 👈 Server 發送時刻
-        "nonce": nonce,                   # 👈 隨機 Nonce
+        "timestamp": timestamp,           #  Server 發送時刻
+        "nonce": nonce,                   #  隨機 Nonce
         "proof": proof,
         "granularity": 1,
         "max_response_time": 10           # Node 最多 10 秒內要回應
@@ -203,13 +203,13 @@ def validate_seed_freshness(challenge_received: dict,
     time_now = time.time()
     delta_t = time_now - challenge_ts
     
-    print(f"⏱️ Challenge 收到延遲: {delta_t:.2f}s")
+    print(f" Challenge 收到延遲: {delta_t:.2f}s")
     
     if delta_t > max_response_time:
-        print(f"❌ Challenge 已過期 (超過 {max_response_time}s)")
+        print(f" Challenge 已過期 (超過 {max_response_time}s)")
         return False, None
     
-    print(f"✅ Challenge 時效性驗證通過")
+    print(f" Challenge 時效性驗證通過")
     return True, delta_t
 
 def generate_response_with_delta_t(challenge_received: dict, 
@@ -352,7 +352,7 @@ class SeededChallengeStore:
         if delta_t > 10:  # 假設 Node 應在 10 秒內回應
             return False, "RESPONSE_TOO_LATE", seed_info
         
-        # ✅ 驗證通過
+        #  驗證通過
         seed_info["status"] = "used"
         seed_info["responses"].append({
             "received_at": time.time(),
@@ -411,7 +411,7 @@ def verify_response_comprehensive(challenge_stored: dict,
 
 ---
 
-## 🎯 部署檢查清單
+##  部署檢查清單
 
 ### Server 端修改
 - [ ] 修改 `config.py`：新增 `SEED_CONFIG` 配置
@@ -436,18 +436,18 @@ SEED_CONFIG = {
 
 ---
 
-## ✅ 安全收益
+##  安全收益
 
 | 威脅 | 狀態 | 防禦機制 |
 |-----|------|--------|
-| **Replay Attack** | ✅ 防禦 | Nonce + 一次性使用檢查 |
-| **Seed 可預測** | ✅ 防禦 | Timestamp + Random Nonce |
-| **過期 Challenge** | ✅ 防禦 | 時間戳記 + delta_t 驗證 |
-| **Brute Force** | ✅ 部分防禦 | 短長 Response Time + 黑名單 |
+| **Replay Attack** |  防禦 | Nonce + 一次性使用檢查 |
+| **Seed 可預測** |  防禦 | Timestamp + Random Nonce |
+| **過期 Challenge** |  防禦 | 時間戳記 + delta_t 驗證 |
+| **Brute Force** |  部分防禦 | 短長 Response Time + 黑名單 |
 
 ---
 
-## 📊 效能考量
+##  效能考量
 
 | 項目 | 值 |
 |-----|-----|
@@ -456,4 +456,6 @@ SEED_CONFIG = {
 | Replay 檢測耗時 | ~0.5ms |
 | **總端到端延遲** | **~2-3s** (包含 MQTT 網路延遲) |
 
-🎯 **結論**：此方案提供業界標準的重放攻擊防禦，同時保持低延遲。
+ **結論**：此方案提供業界標準的重放攻擊防禦，同時保持低延遲。
+
+

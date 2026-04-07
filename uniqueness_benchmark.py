@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 """
 Multi-device uniqueness benchmark for thesis-grade evidence.
 
@@ -228,3 +228,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

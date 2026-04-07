@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Phase 1 코드 검증 스크립트
 Validates that all Phase 1 implementations can be imported and initialized correctly
@@ -12,7 +12,7 @@ import hashlib
 import secrets
 
 print("=" * 70)
-print("🔍 Phase 1 代碼驗證開始")
+print(" Phase 1 代碼驗證開始")
 print("=" * 70)
 
 # Test 1: Import app.py modules
@@ -33,14 +33,14 @@ try:
     
     for component in required_app_components:
         if component in app_content:
-            print(f"  ✅ 找到: {component}")
+            print(f"   找到: {component}")
         else:
-            print(f"  ❌ 缺失: {component}")
+            print(f"   缺失: {component}")
             sys.exit(1)
     
-    print("  ✅ app.py 所有必要組件都存在")
+    print("   app.py 所有必要組件都存在")
 except Exception as e:
-    print(f"  ❌ app.py 驗證失敗: {e}")
+    print(f"   app.py 驗證失敗: {e}")
     sys.exit(1)
 
 # Test 2: Import node.py modules
@@ -58,14 +58,14 @@ try:
     
     for component in required_node_components:
         if component in node_content:
-            print(f"  ✅ 找到: {component}")
+            print(f"   找到: {component}")
         else:
-            print(f"  ❌ 缺失: {component}")
+            print(f"   缺失: {component}")
             sys.exit(1)
     
-    print("  ✅ node.py 所有必要組件都存在")
+    print("   node.py 所有必要組件都存在")
 except Exception as e:
-    print(f"  ❌ node.py 驗證失敗: {e}")
+    print(f"   node.py 驗證失敗: {e}")
     sys.exit(1)
 
 # Test 3: Verify generate_dynamic_seed logic
@@ -85,17 +85,17 @@ try:
         digestmod=hashlib.sha256
     ).hexdigest()
     
-    print(f"  ✅ Timestamp: {timestamp}")
-    print(f"  ✅ Nonce: {nonce[:16]}... (64 chars total)")
-    print(f"  ✅ Seed: {seed_string[:16]}... (64 chars)")
+    print(f"   Timestamp: {timestamp}")
+    print(f"   Nonce: {nonce[:16]}... (64 chars total)")
+    print(f"   Seed: {seed_string[:16]}... (64 chars)")
     
     if len(nonce) == 64 and len(seed_string) == 64:
-        print("  ✅ 動態種子生成邏輯正確")
+        print("   動態種子生成邏輯正確")
     else:
-        print("  ❌ 生成的值長度不符")
+        print("   生成的值長度不符")
         sys.exit(1)
 except Exception as e:
-    print(f"  ❌ 動態種子邏輯驗證失敗: {e}")
+    print(f"   動態種子邏輯驗證失敗: {e}")
     sys.exit(1)
 
 # Test 4: Verify SeededChallengeStore logic
@@ -114,24 +114,24 @@ try:
         "status": "pending"
     }
     
-    print(f"  ✅ 存儲 Nonce: {test_nonce[:16]}...")
+    print(f"   存儲 Nonce: {test_nonce[:16]}...")
     
     # Verify and mark used
     if test_nonce in seed_store_data:
         entry = seed_store_data[test_nonce]
         entry["status"] = "used"
-        print(f"  ✅ 標記 Nonce 為已使用")
+        print(f"   標記 Nonce 為已使用")
     
     # Try second access (should fail)
     if seed_store_data[test_nonce]["status"] == "used":
-        print(f"  ✅ 防重放檢測: 第二次訪問會被拒絕")
+        print(f"   防重放檢測: 第二次訪問會被拒絕")
     else:
-        print(f"  ❌ 防重放檢測失敗")
+        print(f"   防重放檢測失敗")
         sys.exit(1)
         
-    print("  ✅ SeededChallengeStore 邏輯正確")
+    print("   SeededChallengeStore 邏輯正確")
 except Exception as e:
-    print(f"  ❌ SeededChallengeStore 驗證失敗: {e}")
+    print(f"   SeededChallengeStore 驗證失敗: {e}")
     sys.exit(1)
 
 # Test 5: Verify timestamp validation logic
@@ -144,31 +144,32 @@ try:
     # Fresh challenge
     delta_t_fresh = time.time() - challenge_timestamp
     if delta_t_fresh < max_response_time:
-        print(f"  ✅ 新鮮 Challenge: delta_t={delta_t_fresh:.2f}s < {max_response_time}s ✓")
+        print(f"   新鮮 Challenge: delta_t={delta_t_fresh:.2f}s < {max_response_time}s ✓")
     else:
-        print(f"  ❌ 新鮮 Challenge 檢測失敗")
+        print(f"   新鮮 Challenge 檢測失敗")
         sys.exit(1)
     
     # Old challenge (simulated)
     old_timestamp = time.time() - 15  # 15 seconds ago
     delta_t_old = time.time() - old_timestamp
     if delta_t_old > max_response_time:
-        print(f"  ✅ 過期 Challenge: delta_t={delta_t_old:.2f}s > {max_response_time}s ✓ (會被拒絕)")
+        print(f"   過期 Challenge: delta_t={delta_t_old:.2f}s > {max_response_time}s ✓ (會被拒絕)")
     else:
-        print(f"  ❌ 過期 Challenge 檢測失敗")
+        print(f"   過期 Challenge 檢測失敗")
         sys.exit(1)
     
-    print("  ✅ 時間戳記驗證邏輯正確")
+    print("   時間戳記驗證邏輯正確")
 except Exception as e:
-    print(f"  ❌ 時間戳記驗證失敗: {e}")
+    print(f"   時間戳記驗證失敗: {e}")
     sys.exit(1)
 
 print("\n" + "=" * 70)
-print("✅ 所有驗證通過！Phase 1 代碼集成完整且邏輯正確")
+print(" 所有驗證通過！Phase 1 代碼集成完整且邏輯正確")
 print("=" * 70)
-print("\n📋 下一步:")
+print("\n 下一步:")
 print("  1. 依照 TEST_PHASE1_REPLAY.md 運行 5 個測試場景")
 print("  2. 啟動系統: mqtt_bridge.py + node.py + streamlit run app.py")
 print("  3. 驗證重放攻擊防禦是否生效")
 print("  4. 記錄結果，準備周二會議")
 print()
+

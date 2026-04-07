@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Phase 2: Anti-Replay Protection Test
@@ -66,17 +66,17 @@ def main():
         (not result4["authenticated"]) and
         len(engine.used_nonces) == 2
     )
-    print(f'{"✅" if all_passed else "❌"} Phase 2 Anti-Replay functionality {"verified" if all_passed else "failed"}!')
+    print(f'{"" if all_passed else ""} Phase 2 Anti-Replay functionality {"verified" if all_passed else "failed"}!')
     print()
     
     # Detailed output
     print('='*70)
     print('SECURITY ANALYSIS:')
     print('='*70)
-    print(f'✅ Test 1 - First auth: {result1["authenticated"]} (expected True)')
-    print(f'✅ Test 2 - Replay blocked: {not result2["authenticated"]} (expected True)')
-    print(f'✅ Test 3 - New nonce: {result3["authenticated"]} (expected True)')
-    print(f'✅ Test 4 - Bad response: {not result4["authenticated"]} (expected True)')
+    print(f' Test 1 - First auth: {result1["authenticated"]} (expected True)')
+    print(f' Test 2 - Replay blocked: {not result2["authenticated"]} (expected True)')
+    print(f' Test 3 - New nonce: {result3["authenticated"]} (expected True)')
+    print(f' Test 4 - Bad response: {not result4["authenticated"]} (expected True)')
     print()
     print('Security Guarantee:')
     print('- Attackers cannot reuse old (Challenge, Response) pairs')
@@ -86,3 +86,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

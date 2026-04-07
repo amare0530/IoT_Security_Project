@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Phase 1 Code Validation - Windows Compatible"""
 import sys
@@ -160,3 +160,4 @@ print("  2. Start: mqtt_bridge.py + node.py + streamlit run app.py")
 print("  3. Verify replay attack prevention works")
 print("  4. Document results for teacher meeting")
 print()
+
