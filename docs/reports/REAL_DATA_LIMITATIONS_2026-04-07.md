@@ -29,15 +29,22 @@
 ### 項目 1：公開 PUF 資料集轉接器（進行中）
 
 **完成項目**：
-- `public_puf_adapter.py`：支援 CSV/TSV 讀取、欄位正規化、SQLite 寫入、manifest 產生。
-- `docs/guides/PUBLIC_PUF_SOURCES.md`：詳細列出已知公開資料集來源（PUFdb、GitHub、會議資料集等）與下載方式。
+- `public_puf_adapter.py`：支援 CSV/TSV 讀取、欄位正規化、SQLite 寫入、manifest 產生。已通過 smoke test 驗證。
+- `docs/guides/PUBLIC_PUF_SOURCES.md`：已驗證並列出唯一已確認存在的公開資料集（SRAM-Based PUF Readouts by TIMA Laboratory）。
 - 在 README.md 補上使用指南與來源清單連結。
 
+**已驗證存在的公開資料集**：
+- **SRAM-Based PUF Readouts** (TIMA Laboratory, Zenodo)
+  - URL: https://zenodo.org/records/7529513
+  - DOI: 10.1038/s41597-023-02225-9
+  - 84 個 STM32 Nucleo 微控制器的 SRAM 讀取 + 溫度/電壓資料
+  - CSV 格式，可直接用 adapter 轉接
+
 **待完成項目**：
-- 實際從公開資料集（如 PUFdb 或 GitHub）下載樣本。
-- 執行 adapter 進行全流程驗證。
+- 下載 TIMA Laboratory 資料集並執行 adapter 進行全流程驗證。
 - 將正規化資料寫入 `authentication_history.db` 的 `crp_records` 表。
 - 用 `quant_compare_report.py` 驗證量化對比是否正常運作。
+- 繼續搜尋其他開源資料集（但要確認真實存在再列出）。
 
 **使用範例**：
 ```bash
