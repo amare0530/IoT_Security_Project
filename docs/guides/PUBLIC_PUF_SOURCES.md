@@ -1,123 +1,101 @@
-# 公開 PUF 資料集來源指南
+# 公開 PUF 資料集來源指南（實用版）
 
 ## 文件目的
-列出目前已知的公開 SRAM PUF / RO PUF 資料集，包括來源、下載方式、欄位格式與接軌方法。
+整理查找公開 SRAM PUF / RO PUF 資料集的方法。由於公開資料集不如論文多，本文列出已知的搜尋渠道與驗證方式。
 
 ---
 
-## 已知公開資料集
+## 說實話
 
-### 1. PUFdb (Fraunhofer AISEC)
-**來源**：https://pufdb.aisec.fraunhofer.de/
+公開的 PUF 資料集其實不多。大部分 PUF 研究因為涉及硬體特性，資料集通常：
+1. 被公司或研究機構限制分享（需申請）
+2. 只附在論文著作裡（需聯絡作者）
+3. 刪除識別資訊後在 Zenodo、GitHub 刊登
+
+這份指南列出的是「可能找到的渠道」而不是「確保有料」的清單。
+
+---
+
+## 實際可用的搜尋渠道
+
+### 1. GitHub — 最直接
+**搜尋策略**：
+```
+site:github.com PUF SRAM dataset
+site:github.com PUF challenge response
+site:github.com SRAM measurements csv
+```
+
+**常見結果內容**：
+- 部分會議或論文作者的 artifact 倉庫
+- 研究生的專題程式碼與配套測試資料
+- 馬上一個一個點進去檢查是否有 `.csv` 或 `data/` 資料夾
+
+**檢查點**：
+- 看 `README.md` 有沒有清楚說資料從哪來
+- 看 `LICENSE` 是不是允許學術使用
+- 有沒有 `requirements.txt` 或 `.py` 能驗證資料格式
+
+### 2. Zenodo（正式資料倉庫）
+**網址**：https://zenodo.org/
+
+**搜尋**：
+- 關鍵字：`"PUF" AND "SRAM"`、`"PUF" AND "dataset"`、`"PUF" AND "measurement"`
+- 篩選：Publication Type = "Dataset"
+
+**優點**：
+- 有 DOI，可引用
+- 通常會註明 License 與使用限制
+- 多數學術資料集用這裡存
+
+**檢查點**：
+- 看 Description 有沒有清楚說資料格式
+- 看有沒有 `Files` 區段能預覽欄位
+- 注意 License 和 Access 限制
+
+### 3. OSF (Open Science Framework)
+**網址**：https://osf.io/
+
+**搜尋**：
+- 在搜尋框輸入 `PUF SRAM` 或只搜 `PUF`
+- 篩選 Component Type = "Project"
 
 **說明**：
-- 工業級 SRAM PUF 資料庫，包含多數量晶片與環境變異。
-- 提供 CRP (Challenge-Response Pair) 與環境資料（溫度、電壓等）。
-- 需要註冊帳號方可下載，採學術免費授權。
+- 多數是研究者發佈的配套資料
+- 不如 Zenodo 正式，但也滿常見
 
-**資料格式**：
-- CSV 或 TSV，通常欄位包含：
-  - `device_id` 或 `chip_id`
-  - `challenge`
-  - `response`
-  - `temperature`
-  - `voltage`
-  - `timestamp` 或 `date`
+### 4. 論文直接查詢
+**方法**：
+1. 用 Google Scholar 搜 `SRAM PUF dataset`
+2. 進入論文頁面，找 "Data Availability" 或 "Supplementary Materials" 欄
+3. 很多論文會在這裡貼 GitHub 連結、Zenodo DOI、或直接郵件聯絡方式
 
-**適配方式**：
-```bash
-python public_puf_adapter.py \
-  --input pufdb_export.csv \
-  --dataset-name pufdb_[version] \
-  --output-db authentication_history.db \
-  --manifest artifacts/pufdb_manifest.json
+**常見論文與來源** (根據著作與會議記錄)：
+- Fraunhofer AISEC 發表過的 PUF 工作 → 有時附 GitHub
+- CHES、DATE、ISCAS 的 PUF 相關論文 → 通常附 artifact repo
+- 但具體 URL 我不確定，建議直接在這些會議的網站查
+
+### 5. 向研究團隊直接要
+**實際可行性**：
+- Fraunhofer AISEC (PUFdb 製作團隊) — 可試著發信要求學術使用授權
+- 論文作者 — 很多願意分享拿不出品授權的資料
+
+**找聯絡方式**：
+- 在論文或機構網頁找作者 email
+- GitHub 倉庫通常留 issue tracker
+
+---
+
+## 實際工作流程
+
+### 第一步：精準的 Google Scholar 搜尋
+```
+site:scholar.google.com "SRAM PUF" "dataset" OR "measurement"
 ```
 
-**注意事項**：
-- Challenge / Response 通常為十進位或十六進位，轉接器會自動正規化。
-- 若溫度或電壓缺失，會自動補 `0` 或 `unknown`。
+查看有 "Data Availability" 欄的論文。
 
----
-
-### 2. MIT CSAIL / 学术研究發布的 PUF 資料
-**來源範例**：
-- GitHub 倉庫（搜尋關鍵字）：`puf dataset sram`, `puf crp data`
-- Zenodo：https://zenodo.org/（搜尋 "PUF" 或 "SRAM PUF"）
-- OSF (Open Science Framework)：https://osf.io/（搜尋 "PUF"）
-
-**推薦搜尋策略**：
-1. 在 GitHub 上搜： `"PUF" "CRP" "challenge response"` + `filetype:csv`
-2. 在 Zenodo 上搜： `PUF SRAM` 或 `Ring Oscillator PUF`
-3. 在論文的 Supplementary Materials 或 Data Availability 欄查找
-
-**常見論文資料集**：
-- "Modeling and Exploiting the Unpredictability of SRAM PUF" — CMU / Fraunhofer（通常附 GitHub 或 data.zip）
-- "SRAM PUF in the Wild" 系列 — 各校合作研究
-
-**資料格式**：
-- 通常為 CSV，欄位名稱可能有變：
-  - `device`, `node_id`, `chip_number` → adapter 自動對映到 `device_id`
-  - `c`, `q`, `query` → 對映到 `challenge`
-  - `r`, `measurement`, `output` → 對映到 `response`
-  - `temp`, `temp_c`, `temperature_celsius` → 對映到 `temperature_c`
-  - `vdd`, `supply_voltage`, `power` → 對映到 `supply_proxy`
-
-**適配方式**（以某個 GitHub 資料為例）：
-```bash
-# 下載資料
-git clone https://github.com/[university]/puf-dataset.git
-cd puf-dataset
-
-# 轉接到本專案格式
-python ../../public_puf_adapter.py \
-  --input data/sram_puf_measurements.csv \
-  --dataset-name github_[repo_name]_[date] \
-  --output-csv ../../artifacts/github_dataset_normalized.csv \
-  --output-db ../../authentication_history.db \
-  --manifest ../../artifacts/github_manifest.json
-```
-
----
-
-### 3. CHES 工作坊 / 相關國際會議發佈的資料集
-**來源**：
-- CHES (Cryptographic Hardware and Embedded Systems)：https://ches.iacr.org/
-- DATE (Design, Automation and Test in Europe)：https://www.date-conference.com/
-- ISCAS (International Symposium on Circuits and Systems)：https://www.iscas2025.org/
-
-**搜尋方式**：
-- 進入會議網站，找 "Call for Data" 或 "Artifact Evaluation" 區段
-- 查找標題含 "PUF", "Authentication", "Silicon" 的論文
-- 檢查論文的 Data Availability 或 Supplementary 欄
-
-**資料格式**：
-- 通常提供經過消毒的 CRP 集合，格式多樣。
-- 大多數使用 CSV 或 JSON。
-
-**適配方式**：
-- 先用 `--preview` 檢查欄位名稱：
-  ```bash
-  python public_puf_adapter.py --input raw_data.csv --preview --limit 3
-  ```
-- 若 preview 成功，再輸出至目標格式。
-
----
-
-### 4. 業界開源專案
-**來源範例**：
-- **uPUF** (Xilinx / Vivado 相關)：部分提供模擬 PUF 的測試資料
-- **PUF-Library** (TU Darmstadt)：https://github.com/tud-ics/puf-libraries/
-- **FIPS 140 合規 PUF 模組的測試資料**：供應商有時會發佈去識別化的量化資料
-
-**取得方式**：
-- 多數需要向供應商或研究團隊申請
-- 部分在 GitHub 或論文附錄公開
-
----
-
-## 如何驗證資料集適配性
-
-### 第一步：預覽資料
+### 第二步：找到資料集後，用 Adapter 驗證相容性
 ```bash
 python public_puf_adapter.py \
   --input your_dataset.csv \
@@ -125,18 +103,21 @@ python public_puf_adapter.py \
   --preview \
   --limit 5
 ```
+```
+python public_puf_adapter.py \
+  --input your_dataset.csv \
+  --dataset-name test_preview \
+  --preview \
+  --limit 5
+```
 
-### 第二步：檢查輸出
-- 確認 `device_id`、`challenge`、`response` 都被正確對映
-- 確認 `timestamp` 與 `session_id` 已補值
-- 確認 `metadata_json` 包含原始未對映的欄位
+確認 `device_id`、`challenge`、`response` 都被正確對映，若無誤繼續。
 
-### 第三步：正式匯入
+### 第三步：正式匯入到 SQLite
 ```bash
 python public_puf_adapter.py \
   --input your_dataset.csv \
   --dataset-name your_dataset_name \
-  --output-csv artifacts/your_dataset_normalized.csv \
   --output-db authentication_history.db \
   --manifest artifacts/your_dataset_manifest.json
 ```
@@ -153,7 +134,7 @@ conn.close()
 
 ---
 
-## Adapter 欄位對映速查表
+## 欄位對映速查表
 
 | 標準欄位 | 常見別名 |
 |------|--------|
@@ -167,36 +148,13 @@ conn.close()
 
 ---
 
-## 常見問題
+## 從這開始
 
-**Q: 我下載的資料是 Excel（.xlsx）格式，怎麼處理？**
+如果你找到了具體的公開資料集連結（GitHub、Zenodo、論文），把 URL 或檔案放到這裡，我可以幫驗證格式能否對接。如果找不到，就用上面的搜尋方式自己摸。
 
-A: 先轉成 CSV：
-```bash
-python -c "import pandas as pd; pd.read_excel('data.xlsx').to_csv('data.csv', index=False)"
-```
-
-**Q: Challenge 或 Response 的位寬不一致，轉接器會怎樣？**
-
-A: Adapter 會用原始長度當位寬，自動補齊或轉換。若有特定位寬需求，可在匯入後用 `calibrate_from_real_data.py` 調整。
-
-**Q: 資料集沒有提供 device_id，adapter 會怎樣？**
-
-A: 會自動生成 `[dataset_name]_device_[列號]`。
-
-**Q: 轉接後要怎麼在量化對比中用？**
-
-A: 執行 `quant_compare_report.py`，它會自動統計各 `dataset_name` 的 FAR/FRR/HD 分佈。
-
----
-
-## 後續流程
-
-1. **匯入資料**：用 `public_puf_adapter.py` 正規化並寫入 SQLite。
-2. **追蹤來源**：每筆資料都會帶上 `dataset_name`、`source` 與 `metadata_json`。
-3. **量化對比**：用 `quant_compare_report.py` 自動生成 FRR/PassRate/HD 分佈。
-4. **論文報告**：對應 `docs/reports/PAPER_BASELINE_COMPARISON_2026.md` 的量化維度。
-
----
+**誠實話**：PUF 公開資料集真的不多。如果想做嚴肅的 benchmark，可能需要：
+1. 聯絡研究團隊申請授權使用
+2. 自己設計硬體實驗採集
+3. 或者用我們專案的模擬資料當基線（已有），再用任何能找到的小樣本做比對
 
 最後更新：2026-04-07
