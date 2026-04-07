@@ -35,11 +35,11 @@ DEFAULT_DATASET_NAME = "public_puf_dataset"
 DEFAULT_SOURCE = "real"
 
 FIELD_ALIASES = {
-    "device_id": ["device_id", "device", "chip_id", "board_id", "sensor_id"],
-    "challenge": ["challenge", "crp_challenge", "c", "query"],
-    "response": ["response", "crp_response", "r", "reply", "measurement"],
-    "session_id": ["session_id", "session", "run_id", "trial_id", "capture_id"],
-    "timestamp": ["timestamp", "time", "datetime", "capture_time"],
+    "device_id": ["device_id", "device", "chip_id", "board_id", "sensor_id", "uid"],
+    "challenge": ["challenge", "crp_challenge", "c", "query", "address"],
+    "response": ["response", "crp_response", "r", "reply", "measurement", "data"],
+    "session_id": ["session_id", "session", "run_id", "trial_id", "capture_id", "pic"],
+    "timestamp": ["timestamp", "time", "datetime", "capture_time", "created_at"],
     "temperature_c": ["temperature_c", "temperature", "temp_c", "temp"],
     "supply_proxy": ["supply_proxy", "voltage", "vdd", "power_state", "load_state"],
     "metadata_json": ["metadata_json", "metadata", "extra_json"],
@@ -81,15 +81,43 @@ def _binary_to_hex(value: str, bit_length: Optional[int] = None) -> str:
     return f"{int(padded, 2):0{max(1, (bit_length + 3) // 4)}x}"
 
 
+def _decimal_array_to_hex(value: str) -> str:
+    """Convert comma-separated decimal array (e.g., '202,203,204') to hex string."""
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("empty decimal array")
+    
+    # Try to parse as comma-separated decimals
+    try:
+        parts = [int(x.strip()) for x in cleaned.split(',')]
+        # Convert each byte to hex and concatenate
+        hex_str = ''.join(f'{b:02x}' for b in parts)
+        return hex_str
+    except (ValueError, OverflowError) as e:
+        raise ValueError(f"invalid decimal array format: {e}")
+
+
 def _normalize_hex_like(value: str, bit_length: Optional[int] = None) -> str:
     cleaned = value.strip().lower().replace("0x", "", 1)
+    
+    # First, try decimal array format (e.g., "202,203,204,205")
+    if ',' in cleaned:
+        try:
+            return _decimal_array_to_hex(cleaned)
+        except ValueError:
+            pass  # Fall through to next format
+    
+    # Then, try binary format
     if _looks_like_binary(cleaned):
         return _binary_to_hex(cleaned, bit_length=bit_length)
+    
+    # Finally, try hex format
     if _looks_like_hex(cleaned):
         if bit_length:
             width = max(1, (bit_length + 3) // 4)
             return cleaned.zfill(width)
         return cleaned
+    
     raise ValueError(f"unsupported challenge/response format: {value[:32]}")
 
 
