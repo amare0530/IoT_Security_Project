@@ -1,0 +1,2 @@
+device_id,challenge,response,timestamp,temperature_c,supply_proxy,session_id,source,dataset_name,metadata_json
+FU_JEN_NODE_01,0123abcd0123abcd0123abcd0123abcd0123abcd0123abcd0123abcd0123abcd,fedc3210fedc3210fedc3210fedc3210fedc3210fedc3210fedc3210fedc3210,2026-04-07T10:30:00Z,26.4,ac_adapter,session_20260407_a,real,example_open_dataset,"{""notes"": ""first import sample""}"

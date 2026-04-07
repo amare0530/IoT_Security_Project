@@ -1,4 +1,4 @@
-"""
+﻿"""
 ═══════════════════════════════════════════════════════════════════
 IoT 硬體指紋認證系統 - Streamlit 伺服器端 (Server)
 增強版本 - 整合 SQLite 資料庫與完善異常處理
@@ -15,11 +15,11 @@ IoT 硬體指紋認證系統 - Streamlit 伺服器端 (Server)
   (Hamming Distance + Proof)
 
 主要改進：
-  ✅ SQLite 數據庫持久化存儲
-  ✅ 完善的異常處理與錯誤提示
-  ✅ MQTT 線程安全性優化
-  ✅ 歷史記錄查詢與分析
-  ✅ 批量實驗結果統計
+   SQLite 數據庫持久化存儲
+   完善的異常處理與錯誤提示
+   MQTT 線程安全性優化
+   歷史記錄查詢與分析
+   批量實驗結果統計
   
 作者: IoT Security Project
 日期: 2026.03.29 (Enhanced)
@@ -45,7 +45,7 @@ from ui_theme import inject_theme, render_status_badge
 
 st.set_page_config(
     page_title="IoT 安全驗證系統",
-    page_icon="🔒",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -106,6 +106,11 @@ def init_database():
                 hamming_distance INTEGER NOT NULL,
                 threshold INTEGER NOT NULL,
                 result TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'simulated',
+                dataset_name TEXT,
+                session_id TEXT,
+                temperature_c REAL,
+                supply_proxy TEXT,
                 noise_level INTEGER,
                 is_batch INTEGER DEFAULT 0,
                 batch_id TEXT,
@@ -145,6 +150,24 @@ def init_database():
         ]:
             if col_name not in existing_cols:
                 cursor.execute(f"ALTER TABLE batch_experiments ADD COLUMN {col_name} {col_type}")
+
+        # 向後相容：舊 auth_history 若缺少資料來源欄位，啟動時自動補齊。
+        cursor.execute("PRAGMA table_info(auth_history)")
+        auth_existing_cols = {row[1] for row in cursor.fetchall()}
+        for col_name, col_type, default_expr in [
+            ("source", "TEXT", "'simulated'"),
+            ("dataset_name", "TEXT", None),
+            ("session_id", "TEXT", None),
+            ("temperature_c", "REAL", None),
+            ("supply_proxy", "TEXT", None),
+        ]:
+            if col_name not in auth_existing_cols:
+                if default_expr is not None:
+                    cursor.execute(
+                        f"ALTER TABLE auth_history ADD COLUMN {col_name} {col_type} DEFAULT {default_expr}"
+                    )
+                else:
+                    cursor.execute(f"ALTER TABLE auth_history ADD COLUMN {col_name} {col_type}")
         
         # 索引優化
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON auth_history(timestamp)')
@@ -155,10 +178,24 @@ def init_database():
         conn.close()
         return True
     except Exception as e:
-        st.error(f"❌ 資料庫初始化失敗: {str(e)}")
+        st.error(f" 資料庫初始化失敗: {str(e)}")
         return False
 
-def save_auth_result(device_id, challenge, response, hamming_distance, threshold, result, noise_level=None, batch_id=None):
+def save_auth_result(
+    device_id,
+    challenge,
+    response,
+    hamming_distance,
+    threshold,
+    result,
+    noise_level=None,
+    batch_id=None,
+    source="simulated",
+    dataset_name=None,
+    session_id=None,
+    temperature_c=None,
+    supply_proxy=None,
+):
     """將認證結果儲存至資料庫"""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -169,15 +206,31 @@ def save_auth_result(device_id, challenge, response, hamming_distance, threshold
         
         cursor.execute('''
             INSERT INTO auth_history 
-            (timestamp, device_id, challenge, response, hamming_distance, threshold, result, noise_level, is_batch, batch_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (timestamp, device_id, challenge, response, hamming_distance, threshold, result, noise_level, is_batch, batch_id))
+            (timestamp, device_id, challenge, response, hamming_distance, threshold, result, source, dataset_name, session_id, temperature_c, supply_proxy, noise_level, is_batch, batch_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            timestamp,
+            device_id,
+            challenge,
+            response,
+            hamming_distance,
+            threshold,
+            result,
+            source,
+            dataset_name,
+            session_id,
+            temperature_c,
+            supply_proxy,
+            noise_level,
+            is_batch,
+            batch_id,
+        ))
         
         conn.commit()
         conn.close()
         return True
     except Exception as e:
-        st.warning(f"⚠️ 保存認證記錄失敗: {str(e)}")
+        st.warning(f" 保存認證記錄失敗: {str(e)}")
         return False
 
 def save_batch_experiment(
@@ -225,7 +278,7 @@ def save_batch_experiment(
         conn.close()
         return True
     except Exception as e:
-        st.warning(f"⚠️ 保存批量實驗結果失敗: {str(e)}")
+        st.warning(f" 保存批量實驗結果失敗: {str(e)}")
         return False
 
 def get_auth_history(limit=100, device_id=None, is_batch=None):
@@ -253,7 +306,7 @@ def get_auth_history(limit=100, device_id=None, is_batch=None):
         
         return df
     except Exception as e:
-        st.error(f"❌ 查詢歷史記錄失敗: {str(e)}")
+        st.error(f" 查詢歷史記錄失敗: {str(e)}")
         return pd.DataFrame()
 
 def get_batch_statistics(batch_id):
@@ -271,7 +324,7 @@ def get_batch_statistics(batch_id):
         
         return result
     except Exception as e:
-        st.error(f"❌ 查詢統計失敗: {str(e)}")
+        st.error(f" 查詢統計失敗: {str(e)}")
         return None
 
 def get_all_batch_experiments(limit=20):
@@ -286,7 +339,7 @@ def get_all_batch_experiments(limit=20):
         conn.close()
         return df
     except Exception as e:
-        st.error(f"❌ 查詢批量實驗失敗: {str(e)}")
+        st.error(f" 查詢批量實驗失敗: {str(e)}")
         return pd.DataFrame()
 
 def export_history_to_csv():
@@ -297,7 +350,53 @@ def export_history_to_csv():
             return None
         return df.to_csv(index=False)
     except Exception as e:
-        st.error(f"❌ 匯出失敗: {str(e)}")
+        st.error(f" 匯出失敗: {str(e)}")
+        return None
+
+
+def get_available_dataset_names():
+    """讀取 crp_records 可用的 dataset 名稱清單。"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT DISTINCT dataset_name
+            FROM crp_records
+            WHERE source='real' AND dataset_name IS NOT NULL AND TRIM(dataset_name) != ''
+            ORDER BY dataset_name
+            """
+        )
+        rows = [r[0] for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+def get_random_dataset_challenge(dataset_name=None):
+    """從 crp_records 隨機取一筆 challenge 作為真實資料驗證任務。"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        query = """
+            SELECT challenge, dataset_name, session_id, device_id, temperature_c, supply_proxy
+            FROM crp_records
+            WHERE source='real'
+        """
+        params = []
+        if dataset_name and dataset_name != "全部":
+            query += " AND dataset_name = ?"
+            params.append(dataset_name)
+
+        query += " ORDER BY RANDOM() LIMIT 1"
+        row = cursor.execute(query, params).fetchone()
+        conn.close()
+
+        return dict(row) if row else None
+    except Exception:
         return None
 
 # 程式啟動時初始化資料庫
@@ -324,10 +423,10 @@ def calculate_hamming_distance(s1, s2):
         distance = sum(c1 != c2 for c1, c2 in zip(hex1, hex2))
         return distance
     except ValueError as e:
-        st.error(f"❌ Hex 格式錯誤: {str(e)}")
+        st.error(f" Hex 格式錯誤: {str(e)}")
         return None
     except Exception as e:
-        st.error(f"❌ 計算漢明距離時發生錯誤: {str(e)}")
+        st.error(f" 計算漢明距離時發生錯誤: {str(e)}")
         return None
 
 def inject_noise(hex_str, num_bits):
@@ -350,7 +449,7 @@ def inject_noise(hex_str, num_bits):
         
         return hex(int("".join(bits), 2))[2:].zfill(64)
     except Exception as e:
-        st.error(f"❌ 注入雜訊時發生錯誤: {str(e)}")
+        st.error(f" 注入雜訊時發生錯誤: {str(e)}")
         return None
 
 class SeededChallengeStore:
@@ -410,7 +509,7 @@ def generate_dynamic_seed(private_key, granularity=1):
         
         return seed_string, timestamp, nonce
     except Exception as e:
-        st.error(f"❌ 動態 Seed 生成失敗: {str(e)}")
+        st.error(f" 動態 Seed 生成失敗: {str(e)}")
         return None, None, None
 
 def generate_vrf_challenge(private_key, seed):
@@ -427,7 +526,7 @@ def generate_vrf_challenge(private_key, seed):
         
         return c, proof
     except Exception as e:
-        st.error(f"❌ VRF 生成失敗: {str(e)}")
+        st.error(f" VRF 生成失敗: {str(e)}")
         return None, None
 
 # ═══════════════════════════════════════════════════════════════
@@ -438,7 +537,7 @@ if "current_challenge" not in st.session_state:
     st.session_state.current_challenge = None
 
 if "bridge_status" not in st.session_state:
-    st.session_state.bridge_status = "未知🚀"
+    st.session_state.bridge_status = "未知"
 
 if "seed_store" not in st.session_state:
     st.session_state.seed_store = SeededChallengeStore(st.session_state)
@@ -479,7 +578,15 @@ def clear_response():
     except:
         pass
 
-def send_challenge_to_bridge(challenge, noise_level=3, timestamp=None, nonce=None, max_response_time=10):
+def send_challenge_to_bridge(
+    challenge,
+    noise_level=3,
+    timestamp=None,
+    nonce=None,
+    max_response_time=10,
+    challenge_source="vrf",
+    dataset_name=None,
+):
     """
     發送 Challenge 至 Bridge（通過檔案 IPC）
     【Phase 1 改進】包含時間戳記和 Nonce 以支援重放攻擊檢測
@@ -489,6 +596,8 @@ def send_challenge_to_bridge(challenge, noise_level=3, timestamp=None, nonce=Non
             "challenge": challenge,
             "noise_level": noise_level,
             "timestamp": timestamp or time.time(),  # Server 發送時的時間
+            "challenge_source": challenge_source,
+            "dataset_name": dataset_name,
         }
         
         # 如果有 Nonce（動態 Seed 模式），加入 payload
@@ -534,6 +643,25 @@ def get_bridge_heartbeat_snapshot():
     try:
         with open(HEARTBEAT_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
+    except Exception:
+        return None
+
+
+def apply_privacy_amplification(corrected_response):
+    """將糾錯後的 Response 做 SHA-256 雜湊，作為隱私放大步驟。"""
+    try:
+        if not corrected_response:
+            return None
+
+        if isinstance(corrected_response, str):
+            normalized = corrected_response.strip().lower()
+            if normalized.startswith("0x"):
+                normalized = normalized[2:]
+            response_bytes = bytes.fromhex(normalized)
+        else:
+            return None
+
+        return hashlib.sha256(response_bytes).hexdigest()
     except Exception:
         return None
 
@@ -615,6 +743,23 @@ def verify_response_payload(challenge, response_data, threshold=5, persist=True,
         return None
 
     result = "pass" if hd <= threshold else "fail"
+    corrected_response = response
+    privacy_amplification_hash = apply_privacy_amplification(corrected_response)
+
+    if privacy_amplification_hash is None:
+        return {
+            "device_id": device_id,
+            "hamming_distance": -1,
+            "threshold": threshold,
+            "result": "fail",
+            "response": response,
+            "corrected_response": corrected_response,
+            "error": "🚨 隱私放大失敗：無法對 corrected response 進行 SHA-256 雜湊"
+        }
+
+    st.caption(
+        f"Privacy Amplification: corrected={corrected_response[:16]}... -> sha256={privacy_amplification_hash[:16]}..."
+    )
 
     if persist:
         save_auth_result(
@@ -624,6 +769,11 @@ def verify_response_payload(challenge, response_data, threshold=5, persist=True,
             hamming_distance=hd,
             threshold=threshold,
             result=result,
+            source=response_data.get("source", "simulated") if isinstance(response_data, dict) else "simulated",
+            dataset_name=response_data.get("dataset_name") if isinstance(response_data, dict) else None,
+            session_id=response_data.get("session_id") if isinstance(response_data, dict) else None,
+            temperature_c=response_data.get("temperature_c") if isinstance(response_data, dict) else None,
+            supply_proxy=response_data.get("supply_proxy") if isinstance(response_data, dict) else None,
             noise_level=response_data.get("noise_level") if isinstance(response_data, dict) else None,
         )
 
@@ -633,6 +783,8 @@ def verify_response_payload(challenge, response_data, threshold=5, persist=True,
         "threshold": threshold,
         "result": result,
         "response": response,
+        "corrected_response": corrected_response,
+        "privacy_amplification_hash": privacy_amplification_hash,
     }
 
 
@@ -644,6 +796,8 @@ if "last_verify_result" not in st.session_state:
     st.session_state.last_verify_result = None
 if "last_verified_received_time" not in st.session_state:
     st.session_state.last_verified_received_time = None
+if "current_dataset_context" not in st.session_state:
+    st.session_state.current_dataset_context = None
 
 
 inject_theme()
@@ -733,6 +887,19 @@ with st.sidebar:
     )
     send_noise_level = st.slider("發送雜訊等級", 0, 20, 3)
     verify_threshold = st.slider("驗證門檻", 1, 32, 5)
+
+    challenge_mode = st.selectbox(
+        "Challenge 來源",
+        ["VRF 挑戰", "資料集挑戰"],
+        help="資料集挑戰會從 crp_records 抽一筆真實 challenge。",
+    )
+
+    dataset_options = ["全部"] + get_available_dataset_names()
+    selected_dataset_name = st.selectbox(
+        "資料集名稱",
+        dataset_options,
+        help="僅在資料集挑戰模式下生效。",
+    )
     
     # 【Phase 1 新增】動態 Seed 配置
     use_dynamic_seed = st.checkbox("使用動態 Seed (防重放)", value=True, help="啟用時間戳記 + Nonce 密鑰防禦")
@@ -754,8 +921,8 @@ with st.sidebar:
 1. 啟動 `mqtt_bridge.py`（只保留一個 Bridge 視窗）。
 2. 啟動 `node.py`（只保留一個 Node 視窗）。
 3. 在主頁確認 Bridge 狀態為正常，且心跳持續更新。
-4. 點擊「🚀 一鍵驗證」確認最近驗證有更新。
-5. 到「📊 歷史記錄」確認新紀錄已寫入 SQLite。
+4. 點擊「 一鍵驗證」確認最近驗證有更新。
+5. 到「 歷史記錄」確認新紀錄已寫入 SQLite。
             """
         )
 
@@ -786,22 +953,22 @@ def update_verification_state(verify_result, received_time):
 
 def verify_latest_response(threshold):
     if not st.session_state.current_challenge:
-        st.error("❌ 尚未生成 Challenge")
+        st.error(" 尚未生成 Challenge")
         return
 
-    with st.spinner("⏳ 等待 Node 回應中..."):
+    with st.spinner(" 等待 Node 回應中..."):
         latest_response, recv_time = wait_for_latest_response()
 
     if latest_response is None:
         latest_response, recv_time = get_latest_response()
 
     if latest_response is None:
-        st.error("❌ 尚未收到 Response")
+        st.error(" 尚未收到 Response")
         st.info("請確認 Node 與 Bridge 都在執行中")
         return
 
     if recv_time is not None and recv_time == st.session_state.last_verified_received_time:
-        st.info("ℹ️ 這筆 Response 已驗證過，未重複寫入資料庫")
+        st.info(" 這筆 Response 已驗證過，未重複寫入資料庫")
         return
 
     # 【Phase 1 改進】傳入 Nonce 和 seed_store 以進行重放攻擊檢測
@@ -820,7 +987,7 @@ def verify_latest_response(threshold):
 
 action_cols = st.columns(4)
 with action_cols[0]:
-    run_one_click = st.button("🚀 一鍵驗證", use_container_width=True, type="primary")
+    run_one_click = st.button(" 一鍵驗證", use_container_width=True, type="primary")
 with action_cols[1]:
     run_generate = st.button("1. 生成 Challenge", use_container_width=True)
 with action_cols[2]:
@@ -829,8 +996,34 @@ with action_cols[3]:
     run_check = st.button("3. 驗證最新回應", use_container_width=True)
 
 if run_generate:
+    if challenge_mode == "資料集挑戰":
+        dataset_record = get_random_dataset_challenge(selected_dataset_name)
+        if not dataset_record:
+            st.error(" 找不到可用資料集 challenge，請先匯入 real source 的 crp_records")
+        else:
+            st.session_state.current_challenge = dataset_record["challenge"]
+            st.session_state.current_proof = f"dataset:{dataset_record.get('dataset_name', 'unknown')}"
+            st.session_state.current_dataset_context = dataset_record
+
+            if use_dynamic_seed:
+                dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
+                if dynamic_seed:
+                    st.session_state.current_nonce = nonce
+                    st.session_state.current_seed_timestamp = timestamp
+                    st.session_state.seed_store.store_seed(nonce, dynamic_seed, timestamp)
+                else:
+                    st.error(" 動態 Seed 生成失敗")
+                    st.stop()
+            else:
+                st.session_state.current_nonce = None
+                st.session_state.current_seed_timestamp = None
+
+            st.success(" 已生成資料集 Challenge")
+            st.caption(
+                f"dataset={dataset_record.get('dataset_name')} | session={dataset_record.get('session_id')} | device={dataset_record.get('device_id')}"
+            )
     # 【Phase 1 改進】使用動態 Seed 或靜態 Seed
-    if use_dynamic_seed:
+    elif use_dynamic_seed:
         # 動態 Seed：時間戳記 + Nonce
         dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
         if dynamic_seed:
@@ -841,23 +1034,25 @@ if run_generate:
             if challenge:
                 st.session_state.current_challenge = challenge
                 st.session_state.current_proof = proof
-                st.success("✅ 動態 Challenge 已生成 (防重放)")
-                st.info(f"🔐 Nonce: {nonce[:16]}... | Timestamp: {timestamp}")
+                st.session_state.current_dataset_context = None
+                st.success(" 動態 Challenge 已生成 (防重放)")
+                st.info(f" Nonce: {nonce[:16]}... | Timestamp: {timestamp}")
         else:
-            st.error("❌ 動態 Seed 生成失敗")
+            st.error(" 動態 Seed 生成失敗")
     else:
         # 靜態 Seed：使用用戶輸入
         challenge, proof = generate_vrf_challenge(sk, seed_input)
         if challenge:
             st.session_state.current_challenge = challenge
             st.session_state.current_proof = proof
-            st.warning("⚠️ 使用靜態 Seed（未啟用重放攻擊防禦）")
+            st.session_state.current_dataset_context = None
+            st.warning(" 使用靜態 Seed（未啟用重放攻擊防禦）")
         else:
-            st.error("❌ Challenge 生成失敗")
+            st.error(" Challenge 生成失敗")
 
 if run_send:
     if not st.session_state.current_challenge:
-        st.error("❌ 請先生成 Challenge")
+        st.error(" 請先生成 Challenge")
     else:
         clear_response()
         # 【Phase 1】傳遞時間戳記和 Nonce 以支援重放攻擊檢測
@@ -868,23 +1063,64 @@ if run_send:
             send_noise_level,
             timestamp=timestamp,
             nonce=nonce,
-            max_response_time=seed_timeout
+            max_response_time=seed_timeout,
+            challenge_source="dataset" if challenge_mode == "資料集挑戰" else "vrf",
+            dataset_name=(st.session_state.current_dataset_context or {}).get("dataset_name"),
         )
         if sent_ok:
             st.session_state.challenge_sent_time = time.time()
-            st.success("✅ Challenge 已發送")
+            st.success(" Challenge 已發送")
         else:
-            st.error("❌ 發送失敗")
+            st.error(" 發送失敗")
 
 if run_check:
     verify_latest_response(verify_threshold)
 
 if run_one_click:
     # 一鍵驗證需與步驟模式一致，避免繞過動態 Seed 防重放機制。
-    if use_dynamic_seed:
+    if challenge_mode == "資料集挑戰":
+        dataset_record = get_random_dataset_challenge(selected_dataset_name)
+        if not dataset_record:
+            st.error(" 找不到可用資料集 challenge，無法完成一鍵驗證")
+        else:
+            st.session_state.current_challenge = dataset_record["challenge"]
+            st.session_state.current_proof = f"dataset:{dataset_record.get('dataset_name', 'unknown')}"
+            st.session_state.current_dataset_context = dataset_record
+
+            if use_dynamic_seed:
+                dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
+                if not dynamic_seed:
+                    st.error(" 動態 Seed 生成失敗，無法完成一鍵驗證")
+                    st.stop()
+
+                st.session_state.current_nonce = nonce
+                st.session_state.current_seed_timestamp = timestamp
+                st.session_state.seed_store.store_seed(nonce, dynamic_seed, timestamp)
+            else:
+                nonce = None
+                timestamp = None
+                st.session_state.current_nonce = None
+                st.session_state.current_seed_timestamp = None
+
+            clear_response()
+            sent_ok = send_challenge_to_bridge(
+                st.session_state.current_challenge,
+                send_noise_level,
+                timestamp=timestamp,
+                nonce=nonce,
+                max_response_time=seed_timeout,
+                challenge_source="dataset",
+                dataset_name=dataset_record.get("dataset_name"),
+            )
+            if sent_ok:
+                st.session_state.challenge_sent_time = time.time()
+                verify_latest_response(verify_threshold)
+            else:
+                st.error(" 發送失敗，無法完成一鍵驗證")
+    elif use_dynamic_seed:
         dynamic_seed, timestamp, nonce = generate_dynamic_seed(sk, seed_granularity)
         if not dynamic_seed:
-            st.error("❌ 動態 Seed 生成失敗，無法完成一鍵驗證")
+            st.error(" 動態 Seed 生成失敗，無法完成一鍵驗證")
         else:
             st.session_state.current_nonce = nonce
             st.session_state.current_seed_timestamp = timestamp
@@ -900,12 +1136,13 @@ if run_one_click:
                     timestamp=timestamp,
                     nonce=nonce,
                     max_response_time=seed_timeout,
+                    challenge_source="vrf",
                 )
                 if sent_ok:
                     st.session_state.challenge_sent_time = time.time()
                     verify_latest_response(verify_threshold)
                 else:
-                    st.error("❌ 發送失敗，無法完成一鍵驗證")
+                    st.error(" 發送失敗，無法完成一鍵驗證")
     else:
         st.session_state.current_nonce = None
         st.session_state.current_seed_timestamp = None
@@ -913,13 +1150,14 @@ if run_one_click:
         if challenge:
             st.session_state.current_challenge = challenge
             st.session_state.current_proof = proof
+            st.session_state.current_dataset_context = None
             clear_response()
-            sent_ok = send_challenge_to_bridge(challenge, send_noise_level)
+            sent_ok = send_challenge_to_bridge(challenge, send_noise_level, challenge_source="vrf")
             if sent_ok:
                 st.session_state.challenge_sent_time = time.time()
                 verify_latest_response(verify_threshold)
             else:
-                st.error("❌ 發送失敗，無法完成一鍵驗證")
+                st.error(" 發送失敗，無法完成一鍵驗證")
 
 st.divider()
 
@@ -930,7 +1168,7 @@ latest_result = st.session_state.last_verify_result
 if latest_result:
     r1, r2, r3, r4 = st.columns(4)
     with r1:
-        st.metric("結果", "✅ 通過" if latest_result["result"] == "pass" else "❌ 失敗")
+        st.metric("結果", " 通過" if latest_result["result"] == "pass" else " 失敗")
     with r2:
         st.metric("漢明距離", f"{latest_result['hamming_distance']} bits")
     with r3:
@@ -942,6 +1180,14 @@ if latest_result:
         st.success("認證成功：設備特徵符合預期")
     else:
         st.error("認證失敗：距離超過門檻")
+
+    if latest_result.get("privacy_amplification_hash"):
+        st.caption(
+            f"隱私放大 SHA-256：{latest_result['privacy_amplification_hash']}"
+        )
+        st.caption(
+            f"對照：corrected={latest_result.get('corrected_response', '')[:24]}... -> hash={latest_result['privacy_amplification_hash'][:24]}..."
+        )
 else:
     st.info("尚未有驗證結果，請先使用一鍵驗證或步驟操作")
 
@@ -968,8 +1214,11 @@ with st.expander("進階工具：手動輸入驗證（選用）", expanded=False
         hd = calculate_hamming_distance(st.session_state.current_challenge, manual_response)
         if hd is not None:
             st.metric("手動驗證漢明距離", f"{hd} bits")
+            manual_hash = apply_privacy_amplification(manual_response)
+            if manual_hash:
+                st.caption(f"手動輸入 SHA-256：{manual_hash}")
 
-tab_batch, tab_history, tab_monitor = st.tabs(["🛡️ 批量實驗", "📊 歷史記錄", "⚙️ 系統監控"])
+tab_batch, tab_history, tab_monitor = st.tabs([" 批量實驗", " 歷史記錄", "⚙️ 系統監控"])
 
 with tab_batch:
     st.subheader("容錯能力測試（100 次）")
@@ -980,7 +1229,7 @@ with tab_batch:
         with c2:
             exp_threshold = st.number_input("實驗容錯門檻", 0, 256, 5, key="batch_threshold")
 
-        if st.button("🚀 執行 100 次實驗", key="run_batch"):
+        if st.button(" 執行 100 次實驗", key="run_batch"):
             batch_id = f"batch_{int(time.time() * 1000)}"
             progress_bar = st.progress(0)
             results = []
@@ -1002,6 +1251,7 @@ with tab_batch:
                             hamming_distance=hd,
                             threshold=exp_threshold,
                             result=result,
+                            source="simulated",
                             noise_level=exp_noise,
                             batch_id=batch_id,
                         )
@@ -1045,21 +1295,23 @@ with tab_batch:
                         f"HD 分佈：平均 {avg_hd:.2f} | 標準差 {hd_std:.2f} | P10 {hd_p10:.1f} | P90 {hd_p90:.1f}"
                     )
 
-                    st.success(f"✅ 實驗完成（Batch ID: {batch_id}）")
+                    st.success(f" 實驗完成（Batch ID: {batch_id}）")
             except Exception as e:
-                st.error(f"❌ 實驗執行失敗: {str(e)}\n{traceback.format_exc()}")
+                st.error(f" 實驗執行失敗: {str(e)}\n{traceback.format_exc()}")
     else:
         st.warning("請先生成 Challenge 再執行批量實驗")
 
 with tab_history:
     st.subheader("認證歷史記錄")
-    f1, f2, f3 = st.columns(3)
+    f1, f2, f3, f4 = st.columns(4)
     with f1:
         limit = st.number_input("顯示筆數", 10, 1000, 100, key="history_limit")
     with f2:
         filter_device = st.selectbox("篩選設備", ["全部", "FU_JEN_NODE_01"], key="history_device")
     with f3:
         filter_result = st.selectbox("篩選結果", ["全部", "pass", "fail"], key="history_result")
+    with f4:
+        filter_source = st.selectbox("資料來源", ["全部", "real", "simulated"], key="history_source")
 
     df = get_auth_history(limit=limit)
     if not df.empty:
@@ -1067,11 +1319,13 @@ with tab_history:
             df = df[df["device_id"] == filter_device]
         if filter_result != "全部":
             df = df[df["result"] == filter_result]
+        if filter_source != "全部" and "source" in df.columns:
+            df = df[df["source"] == filter_source]
 
         st.dataframe(df, use_container_width=True)
         csv_data = df.to_csv(index=False)
         st.download_button(
-            label="📥 下載 CSV",
+            label=" 下載 CSV",
             data=csv_data,
             file_name=f"auth_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
@@ -1128,3 +1382,5 @@ IPC Files: challenge_out.json / response_in.json / bridge_status.json
 
 st.markdown("---")
 st.caption("IoT 硬體指紋認證系統 - 簡化介面版")
+
+

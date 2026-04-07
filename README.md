@@ -12,6 +12,12 @@ PUF-based IoT device authentication demo project.
 2. `docs/guides/QUICKSTART.md`
 3. `app.py`, `node.py`, `mqtt_bridge.py`（三個核心執行檔）
 
+如果要先準備和老師報告，建議先看：
+
+1. `docs/reports/ADVISOR_BRIEF_2026-04-07.md`
+2. `docs/reports/PAPER_BASELINE_COMPARISON_2026-04-07.md`
+3. `docs/guides/SYSTEM_DATAFLOW_ARCHITECTURE.md`
+
 ## 系統架構（一句話版）
 
 - `app.py`：Streamlit UI + 認證判斷（Server 角色）
@@ -40,6 +46,21 @@ python mqtt_bridge.py
 
 Terminal C
 ```bash
+python node.py
+```
+
+若要用資料集模式啟動 Node（從 `crp_records` 回傳 response）：
+
+```bash
+$env:PUF_MODE="dataset"
+python node.py
+```
+
+可選參數：
+
+```bash
+$env:DATASET_NAME="your_dataset_name"
+$env:ALLOW_SIM_FALLBACK="0"
 python node.py
 ```
 
@@ -88,6 +109,42 @@ python node.py
 - `artifacts/eer_analysis.txt`
 - `artifacts/extreme_env_test/environment_comparison.json`
 
+## 開源/真實資料接軌（已完成第一階段）
+
+目前已加入 CSV 驗證與 SQLite 匯入流程，可把開源或實測 CRP 資料納入同一套資料庫。
+
+1. 先準備資料欄位（可直接用範本）
+
+- `docs/guides/REAL_DATA_SCHEMA_TEMPLATE.csv`
+
+2. 先只做驗證（不寫入）
+
+```bash
+python real_data_ingest.py --input docs/guides/REAL_DATA_SCHEMA_TEMPLATE.csv --validate-only
+```
+
+3. 驗證通過後再匯入 SQLite
+
+```bash
+python real_data_ingest.py --input your_dataset.csv --dataset-name your_open_dataset_name
+```
+
+4. 在 UI 的「歷史記錄」頁，可用 `資料來源` 篩選 `real/simulated`。
+
+補充：
+- `auth_history` 現在有 `source/dataset_name/session_id/temperature_c/supply_proxy` 欄位。
+- 新增 `crp_records` 表專門存放開源/實測資料集，不會污染即時驗證流程。
+
+## 論文對照摘要輸出
+
+可用下列指令自動產生一份量化摘要 Markdown（含 FRR/PassRate/HD 與 source 分佈）：
+
+```bash
+python quant_compare_report.py
+```
+
+預設輸出到 `docs/reports/QUANT_COMPARISON_YYYY-MM-DD.md`。
+
 ## 安全重點
 
 1. Dynamic challenge + timestamp 檢查：限制重放窗口。
@@ -105,3 +162,5 @@ python node.py
 1. 先完整跑一次 `verify_all_phases.py`。
 2. 再用 `batch_test.py` + `eer_scan.py` 做你要報告的閾值選擇依據。
 3. 若要口試展示，建議固定噪聲設定並預先產生 `artifacts/`。
+
+

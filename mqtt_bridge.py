@@ -1,4 +1,4 @@
-"""
+﻿"""
 MQTT bridge between Streamlit app and simulated IoT node.
 
 This process exists because `app.py` currently uses local JSON files for IPC
@@ -46,7 +46,7 @@ def enforce_single_instance(lock_port=45831):
         lock_socket.listen(1)
         return lock_socket
     except OSError:
-        print("❌ [Bridge] 偵測到另一個 mqtt_bridge.py 已在執行，請先關閉重複實例")
+        print(" [Bridge] 偵測到另一個 mqtt_bridge.py 已在執行，請先關閉重複實例")
         sys.exit(1)
 
 
@@ -62,32 +62,32 @@ def write_heartbeat(extra_message=""):
         with open(HEARTBEAT_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"⚠️ [Bridge] 寫入心跳檔失敗: {e}")
+        print(f" [Bridge] 寫入心跳檔失敗: {e}")
 
 
 def on_connect(client, userdata, flags, rc):
     global bridge_connected
     if rc == 0:
         bridge_connected = True
-        print(f"✅ [Bridge] 已成功連接到 MQTT Broker ({BROKER})")
+        print(f" [Bridge] 已成功連接到 MQTT Broker ({BROKER})")
         client.subscribe(TOPIC_RESPONSE, qos=1)
-        print(f"✅ [Bridge] 已訂閱主題: {TOPIC_RESPONSE}")
+        print(f" [Bridge] 已訂閱主題: {TOPIC_RESPONSE}")
         write_heartbeat("connected")
     else:
         bridge_connected = False
-        print(f"❌ [Bridge] 連接失敗，代碼: {rc}")
+        print(f" [Bridge] 連接失敗，代碼: {rc}")
         write_heartbeat(f"connect failed: {rc}")
 
 
 def on_disconnect(client, userdata, rc):
     global bridge_connected
     bridge_connected = False
-    print(f"⚠️ [Bridge] MQTT 連線中斷 (rc={rc})")
+    print(f" [Bridge] MQTT 連線中斷 (rc={rc})")
     write_heartbeat(f"disconnected: {rc}")
 
 
 def on_message(client, userdata, msg):
-    print(f"📥 [Bridge] 收到 MQTT 訊息 (Topic: {msg.topic})")
+    print(f" [Bridge] 收到 MQTT 訊息 (Topic: {msg.topic})")
     try:
         payload = json.loads(msg.payload.decode("utf-8"))
         print(f"   Payload: {str(payload)[:100]}...")
@@ -104,10 +104,10 @@ def on_message(client, userdata, msg):
                 indent=2,
             )
 
-        print(f"✅ [Bridge] 已將 Response 寫入 {OUT_FILE}")
+        print(f" [Bridge] 已將 Response 寫入 {OUT_FILE}")
         write_heartbeat("response forwarded")
     except Exception as e:
-        print(f"❌ [Bridge] 處理訊息錯誤: {e}")
+        print(f" [Bridge] 處理訊息錯誤: {e}")
         write_heartbeat(f"message error: {e}")
 
 
@@ -135,10 +135,10 @@ try:
     ensure_ipc_files()
     write_heartbeat("starting")
 
-    print(f"🔌 [Bridge] 正在連線 {BROKER}:{PORT} ...")
+    print(f" [Bridge] 正在連線 {BROKER}:{PORT} ...")
     client.connect_async(BROKER, PORT, KEEPALIVE)
     client.loop_start()
-    print("✅ [Bridge] MQTT 背景監聽已啟動")
+    print(" [Bridge] MQTT 背景監聽已啟動")
 
     # Poll file-based command channel and forward only newer challenge events.
     while True:
@@ -149,7 +149,7 @@ try:
 
                 cmd_time = data.get("timestamp", 0)
                 if cmd_time > last_challenge_time:
-                    print("\n📤 [Bridge] 偵測到新的 Challenge 任務，準備發送...")
+                    print("\n [Bridge] 偵測到新的 Challenge 任務，準備發送...")
                     payload_to_send = json.dumps(
                         {
                             "challenge": data.get("challenge"),
@@ -157,12 +157,14 @@ try:
                             "timestamp": cmd_time,
                             "nonce": data.get("nonce"),
                             "max_response_time": data.get("max_response_time", 10),
+                            "challenge_source": data.get("challenge_source", "vrf"),
+                            "dataset_name": data.get("dataset_name"),
                         }
                     )
 
                     result = client.publish(TOPIC_CHALLENGE, payload_to_send, qos=1)
                     if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                        print("✅ [Bridge] Challenge 已透過 MQTT 成功發送")
+                        print(" [Bridge] Challenge 已透過 MQTT 成功發送")
                         last_challenge_time = cmd_time
 
                         # 清空目前的 response_in.json，等待新回應
@@ -171,21 +173,21 @@ try:
 
                         write_heartbeat("challenge forwarded")
                     else:
-                        print(f"❌ [Bridge] 發送 Challenge 失敗，代碼: {result.rc}")
+                        print(f" [Bridge] 發送 Challenge 失敗，代碼: {result.rc}")
                         write_heartbeat(f"publish failed: {result.rc}")
 
         except json.JSONDecodeError:
             # 檔案正在寫入中，下一輪再讀
             pass
         except Exception as e:
-            print(f"❌ [Bridge] 輪詢迴圈錯誤: {e}")
+            print(f" [Bridge] 輪詢迴圈錯誤: {e}")
             write_heartbeat(f"loop error: {e}")
 
         write_heartbeat("running")
         time.sleep(POLL_INTERVAL_SECONDS)
 
 except KeyboardInterrupt:
-    print("\n⏹️ 停止 MQTT Bridge...")
+    print("\n 停止 MQTT Bridge...")
 finally:
     try:
         client.loop_stop()
@@ -197,4 +199,6 @@ finally:
             _instance_lock_socket.close()
     except Exception:
         pass
-    print("✅ [Bridge] 已結束")
+    print(" [Bridge] 已結束")
+
+
