@@ -135,6 +135,32 @@ python real_data_ingest.py --input your_dataset.csv --dataset-name your_open_dat
 - `auth_history` 現在有 `source/dataset_name/session_id/temperature_c/supply_proxy` 欄位。
 - 新增 `crp_records` 表專門存放開源/實測資料集，不會污染即時驗證流程。
 
+### 公開資料集轉接器
+
+如果你手上有公開 PUF 資料集的 CSV 或 TSV，可以先用 `public_puf_adapter.py` 轉成本專案的標準格式。
+
+**先參考** [公開 PUF 資料集來源指南](docs/guides/PUBLIC_PUF_SOURCES.md)，了解現有的公開資料集在哪裡、怎麼下載與驗證格式相容性。
+
+常用指令如下：
+
+```bash
+# 先預覽，確認欄位能否對映
+python public_puf_adapter.py --input your_public_dataset.csv --dataset-name demo --preview --limit 5
+
+# 正式轉接並輸出 CSV
+python public_puf_adapter.py --input your_public_dataset.csv --dataset-name your_dataset_name --output-csv artifacts/your_dataset_normalized.csv
+
+# 直接寫入 SQLite（推薦）
+python public_puf_adapter.py --input your_public_dataset.csv --dataset-name your_dataset_name --output-db authentication_history.db --manifest artifacts/your_dataset_manifest.json
+```
+
+此工具會自動處理常見欄位名稱差異，例如 device、session、temperature、voltage 等，並補上 metadata_json。每筆資料都會帶上：
+- `dataset_name`：資料集識別符
+- `source`：標記為 `real`（表示來自公開/實驗資料）
+- `metadata_json`：原始資料的無法對映欄位與來源檔案資訊
+- `session_id`：若原資料缺失，會補上 `[dataset_name]_session_[列號]`
+- `timestamp`：若原資料缺失，會用匯入時刻補上
+
 ## 論文對照摘要輸出
 
 可用下列指令自動產生一份量化摘要 Markdown（含 FRR/PassRate/HD 與 source 分佈）：

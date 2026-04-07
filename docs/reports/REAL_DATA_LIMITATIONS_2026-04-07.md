@@ -10,7 +10,7 @@
 
 ## 目前限制
 1. `node.py` 還是模擬回應，尚未接實體採集路徑。
-2. 不同開源資料集欄位格式不一，仍需逐資料集做轉接。
+2. 不同開源資料集欄位格式不一，仍需逐資料集做轉接（**已開始處理**）。
 3. 多數分析腳本尚未強制跨 session 切分評估。
 4. `temperature_c`、`supply_proxy` 的品質取決於外部資料內容。
 5. 匯入資料尚未附檔案雜湊與來源簽章。
@@ -24,11 +24,36 @@
 - 已將 `source` 納入寫入與查詢流程。
 - 已建立可重跑的資料匯入入口。
 
-## 下一步
-1. 先做至少一個公開資料集的 adapter。
-2. 強制 train/test 以 `session_id` 與 `source` 切分。
-3. 增加 provenance manifest（檔案 hash、匯入時間、dataset 名稱）。
-4. 將 `crp_records` 接入攻防 benchmark 腳本。
+## 缺漏清單進度
+
+### 項目 1：公開 PUF 資料集轉接器（進行中）
+
+**完成項目**：
+- `public_puf_adapter.py`：支援 CSV/TSV 讀取、欄位正規化、SQLite 寫入、manifest 產生。
+- `docs/guides/PUBLIC_PUF_SOURCES.md`：詳細列出已知公開資料集來源（PUFdb、GitHub、會議資料集等）與下載方式。
+- 在 README.md 補上使用指南與來源清單連結。
+
+**待完成項目**：
+- 實際從公開資料集（如 PUFdb 或 GitHub）下載樣本。
+- 執行 adapter 進行全流程驗證。
+- 將正規化資料寫入 `authentication_history.db` 的 `crp_records` 表。
+- 用 `quant_compare_report.py` 驗證量化對比是否正常運作。
+
+**使用範例**：
+```bash
+# 先預覽
+python public_puf_adapter.py --input dataset.csv --dataset-name my_dataset --preview --limit 5
+
+# 正式轉接
+python public_puf_adapter.py --input dataset.csv --dataset-name my_dataset \
+  --output-db authentication_history.db \
+  --manifest artifacts/dataset_manifest.json
+```
+
+### 項目 2-4：後續
+- 強制 train/test 以 `session_id` 與 `source` 切分。
+- 補充 provenance manifest 的實際應用案例。
+- 將 `crp_records` 接入攻防 benchmark 腳本。
 
 
 
