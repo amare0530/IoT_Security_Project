@@ -921,8 +921,8 @@ with st.sidebar:
     challenge_mode = st.selectbox(
         "Challenge 來源",
         ["VRF 挑戰", "資料集挑戰"],
-        index=1,
-        help="資料集挑戰會從 crp_records 抽一筆真實 challenge。",
+        index=0,
+        help="VRF 挑戰為主要驗證方式，資料集挑戰用於離線評估。",
     )
 
     dataset_options = ["全部"] + get_available_dataset_names()
