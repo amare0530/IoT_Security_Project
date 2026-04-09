@@ -41,10 +41,10 @@ RETRY_DELAY = 3  # 秒
 INSTANCE_LOCK_PORT = 45832
 DB_PATH = "authentication_history.db"
 
-# Node 回應模式：simulated 或 dataset
-PUF_MODE = os.getenv("PUF_MODE", "simulated").strip().lower()
+# Node 回應模式：simulated 或 dataset（預設使用真實資料集）
+PUF_MODE = os.getenv("PUF_MODE", "dataset").strip().lower()
 DATASET_NAME = os.getenv("DATASET_NAME", "").strip() or None
-ALLOW_SIM_FALLBACK = os.getenv("ALLOW_SIM_FALLBACK", "1").strip() == "1"
+ALLOW_SIM_FALLBACK = os.getenv("ALLOW_SIM_FALLBACK", "0").strip() == "1"
 
 # ═══════════════════════════════════════════════════════════════
 # 【PUF 模擬核心函數】
@@ -102,7 +102,13 @@ def normalize_hex(value: str) -> str:
     return normalized
 
 
-def get_dataset_response(challenge_hex: str, dataset_name: Optional[str] = None):
+def get_dataset_response(
+    challenge_hex: str,
+    dataset_name: Optional[str] = None,
+    target_device_id: Optional[str] = None,
+    target_session_id: Optional[str] = None,
+    target_timestamp: Optional[str] = None,
+):
     """從 crp_records 取回對應 challenge 的 response 與 metadata。"""
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -120,6 +126,18 @@ def get_dataset_response(challenge_hex: str, dataset_name: Optional[str] = None)
         if dataset_name:
             query += " AND dataset_name = ?"
             params.append(dataset_name)
+
+        if target_device_id:
+            query += " AND device_id = ?"
+            params.append(target_device_id)
+
+        if target_session_id:
+            query += " AND session_id = ?"
+            params.append(target_session_id)
+
+        if target_timestamp:
+            query += " AND timestamp = ?"
+            params.append(target_timestamp)
 
         query += " ORDER BY RANDOM() LIMIT 1"
         row = cursor.execute(query, params).fetchone()
@@ -230,7 +248,16 @@ def on_message(client, userdata, msg):
         if PUF_MODE == "dataset":
             payload_dataset_name = payload.get("dataset_name")
             target_dataset = payload_dataset_name or DATASET_NAME
-            record = get_dataset_response(challenge, dataset_name=target_dataset)
+            target_device_id = payload.get("target_device_id")
+            target_session_id = payload.get("target_session_id")
+            target_timestamp = payload.get("target_timestamp")
+            record = get_dataset_response(
+                challenge,
+                dataset_name=target_dataset,
+                target_device_id=target_device_id,
+                target_session_id=target_session_id,
+                target_timestamp=target_timestamp,
+            )
 
             if record:
                 response = normalize_hex(record.get("response"))

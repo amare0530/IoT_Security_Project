@@ -167,7 +167,7 @@ Reality: No inter-device uniqueness metric on 84-device population
 3. **Population Scaling**: Verify metrics at N=84
 
 ### Documentation
-1. Update [PHASE_2_RESULTS_SHOWCASE.md](PHASE_2_RESULTS_SHOWCASE.md) with real data validation
+1. Update `docs/reports/ADVISOR_BRIEF_2026-04-07.md` with real data validation
 2. Record all failure modes and remediation in technical report
 
 ---

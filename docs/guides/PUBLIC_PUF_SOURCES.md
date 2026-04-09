@@ -22,7 +22,7 @@
 
 **資料格式**：
 兩個 CSV 文件：
-1. SRAM 記憶體讀取（`crp_data.csv`）：
+1. SRAM 記憶體讀取（`crps.csv`）：
    - `board_type`: "Nucleo"
    - `uid`: STM32 96 位 ID（24 十六進位字元）
    - `pic`: 設備在鏈中的位置（1-84）
@@ -48,14 +48,14 @@ cd sram_puf_readouts
 
 # 2. 預覽資料（確認欄位對映）
 python YOUR_PROJECT/public_puf_adapter.py \
-  --input crp_data.csv \
+  --input crps.csv \
   --dataset-name sram_puf_tima_2023 \
   --preview \
   --limit 3
 
 # 3. 轉接到本專案格式
 python YOUR_PROJECT/public_puf_adapter.py \
-  --input crp_data.csv \
+  --input crps.csv \
   --dataset-name sram_puf_tima_2023 \
   --output-db YOUR_PROJECT/authentication_history.db \
   --manifest YOUR_PROJECT/artifacts/sram_puf_manifest.json

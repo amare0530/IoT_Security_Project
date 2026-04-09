@@ -1,8 +1,8 @@
 ﻿# IoT Security Project
 
-PUF-based IoT device authentication demo project.
+PUF-based IoT device authentication research prototype.
 
-本專案現在是「可重現實驗 + 展示」型態，不是 production service。
+本專案現在是「可重現實驗 + 開源資料接軌 + 系統驗證」型態，不是 production service。
 
 ## 你應該先看哪裡
 
@@ -18,11 +18,28 @@ PUF-based IoT device authentication demo project.
 2. `docs/reports/PAPER_BASELINE_COMPARISON_2026-04-07.md`
 3. `docs/guides/SYSTEM_DATAFLOW_ARCHITECTURE.md`
 
+如果要先確認正式 baseline，建議先看：
+
+1. `docs/reports/PAPER_BASELINE_COMPARISON_2026-04-07.md`
+2. `docs/reports/QUANT_COMPARISON_2026-04-07.md`
+3. `docs/reports/ADVISOR_BRIEF_2026-04-07.md`
+
 ## 系統架構（一句話版）
 
 - `app.py`：Streamlit UI + 認證判斷（Server 角色）
 - `mqtt_bridge.py`：把 UI 與 MQTT 裝置之間做檔案 IPC 橋接
-- `node.py`：模擬裝置端 PUF 回應
+- `node.py`：裝置端 PUF 回應，優先從 `crp_records` 取資料，必要時才走模擬回退
+
+## 正式 Baseline（報告主線）
+
+1. **資料基礎**：Vinagrero et al. (2023), Scientific Data
+	- 用途：證明公開 SRAM PUF 資料的來源、規模與環境條件。
+2. **工具基準**：pypuf
+	- 用途：對照可重現模擬與真實資料驅動流程。
+3. **研究型 baseline**：PUF 神經網路建模攻擊、LP-PUF
+	- 用途：對照實作變體與攻擊模型，說明加入抗重放與可審計流程的必要性。
+
+本專題的定位不是提出新密碼原語，而是把真實 SRAM PUF 資料工程化為可比較、可重現、可審計的 IoT 認證流程。
 
 ## 快速啟動（Windows）
 
@@ -56,11 +73,21 @@ $env:PUF_MODE="dataset"
 python node.py
 ```
 
+目前 `node.py` 預設就是 `PUF_MODE=dataset`，且預設停用模擬回退（`ALLOW_SIM_FALLBACK=0`）。
+
 可選參數：
 
 ```bash
 $env:DATASET_NAME="your_dataset_name"
 $env:ALLOW_SIM_FALLBACK="0"
+python node.py
+```
+
+若要暫時切回舊模擬模式：
+
+```bash
+$env:PUF_MODE="simulated"
+$env:ALLOW_SIM_FALLBACK="1"
 python node.py
 ```
 
@@ -70,7 +97,7 @@ python node.py
 
 - `app.py`：Web UI、認證流程、SQLite 歷史紀錄
 - `mqtt_bridge.py`：MQTT <-> 本地檔案 IPC 橋接
-- `node.py`：模擬裝置端，收到 challenge 後生成 response
+- `node.py`：裝置端，收到 challenge 後優先查詢資料集回應，否則才使用模擬回退
 - `puf_simulator.py`：PUF 與雜訊模型核心
 
 ### B. 實驗與分析腳本
@@ -112,6 +139,14 @@ python node.py
 ## 開源/真實資料接軌（已完成第一階段）
 
 目前已加入 CSV 驗證與 SQLite 匯入流程，可把開源或實測 CRP 資料納入同一套資料庫。
+
+如果你要直接抓 Zenodo 7529513 的真實資料，先用：
+
+```bash
+python download_zenodo_7529513.py --output-dir artifacts/zenodo_7529513
+```
+
+它會下載兩個真實檔案：`crps.csv` 和 `sensors.csv`。
 
 1. 先準備資料欄位（可直接用範本）
 
@@ -176,6 +211,12 @@ python quant_compare_report.py
 1. Dynamic challenge + timestamp 檢查：限制重放窗口。
 2. Nonce cache：阻擋 session 內重放。
 3. HD threshold：是安全與可用性的權衡，不是越高越好。
+
+## 目前狀態與限制
+
+1. 目前是「模擬 + 開源資料接軌」混合狀態。
+2. 本系統已完成系統層驗證，但尚未宣稱完成硬體端完整閉環。
+3. 後續重點是補齊 FAR / FRR / EER 曲線、baseline 對照與實體板子對接。
 
 ## 已清理項目
 

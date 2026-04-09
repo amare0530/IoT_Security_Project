@@ -159,6 +159,9 @@ try:
                             "max_response_time": data.get("max_response_time", 10),
                             "challenge_source": data.get("challenge_source", "vrf"),
                             "dataset_name": data.get("dataset_name"),
+                            "target_device_id": data.get("target_device_id"),
+                            "target_session_id": data.get("target_session_id"),
+                            "target_timestamp": data.get("target_timestamp"),
                         }
                     )
 

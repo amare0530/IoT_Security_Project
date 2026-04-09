@@ -382,7 +382,7 @@ def get_random_dataset_challenge(dataset_name=None):
         cursor = conn.cursor()
 
         query = """
-            SELECT challenge, dataset_name, session_id, device_id, temperature_c, supply_proxy
+            SELECT challenge, response, timestamp, dataset_name, session_id, device_id, temperature_c, supply_proxy
             FROM crp_records
             WHERE source='real'
         """
@@ -406,6 +406,13 @@ init_database()
 # 【核心邏輯函數】
 # ═══════════════════════════════════════════════════════════════
 
+def _normalize_hex(value):
+    normalized = (value or "").strip().lower()
+    if normalized.startswith("0x"):
+        normalized = normalized[2:]
+    return normalized
+
+
 def calculate_hamming_distance(s1, s2):
     """
     計算兩個 Hex 字串之間的漢明距離
@@ -415,9 +422,16 @@ def calculate_hamming_distance(s1, s2):
         if not s1 or not s2:
             raise ValueError("Challenge 或 Response 不能為空")
         
-        # 轉為二進制
-        hex1 = bin(int(s1, 16))[2:].zfill(256)
-        hex2 = bin(int(s2, 16))[2:].zfill(256)
+        s1 = _normalize_hex(s1)
+        s2 = _normalize_hex(s2)
+
+        max_bits = max(len(s1), len(s2)) * 4
+        if max_bits == 0:
+            raise ValueError("Challenge 或 Response 不能為空")
+
+        # 支援不同長度的十六進位字串（例如 32-bit challenge 與 4096-bit response）
+        hex1 = bin(int(s1, 16))[2:].zfill(max_bits)
+        hex2 = bin(int(s2, 16))[2:].zfill(max_bits)
         
         # 計算不同位元數
         distance = sum(c1 != c2 for c1, c2 in zip(hex1, hex2))
@@ -586,6 +600,9 @@ def send_challenge_to_bridge(
     max_response_time=10,
     challenge_source="vrf",
     dataset_name=None,
+    target_device_id=None,
+    target_session_id=None,
+    target_timestamp=None,
 ):
     """
     發送 Challenge 至 Bridge（通過檔案 IPC）
@@ -598,6 +615,9 @@ def send_challenge_to_bridge(
             "timestamp": timestamp or time.time(),  # Server 發送時的時間
             "challenge_source": challenge_source,
             "dataset_name": dataset_name,
+            "target_device_id": target_device_id,
+            "target_session_id": target_session_id,
+            "target_timestamp": target_timestamp,
         }
         
         # 如果有 Nonce（動態 Seed 模式），加入 payload
@@ -692,7 +712,16 @@ def get_auth_count():
         return 0
 
 
-def verify_response_payload(challenge, response_data, threshold=5, persist=True, nonce=None, seed_store=None, seed_timeout=30):
+def verify_response_payload(
+    challenge,
+    response_data,
+    threshold=5,
+    persist=True,
+    nonce=None,
+    seed_store=None,
+    seed_timeout=30,
+    expected_response=None,
+):
     """
     驗證 response payload，必要時寫入資料庫並回傳結果字典。
     【Phase 1 新增】包含重放攻擊檢測
@@ -738,7 +767,8 @@ def verify_response_payload(challenge, response_data, threshold=5, persist=True,
                 "error": f"🚨 重放攻擊防禦觸發: {reason}"
             }
 
-    hd = calculate_hamming_distance(challenge, response)
+    reference = expected_response or challenge
+    hd = calculate_hamming_distance(reference, response)
     if hd is None:
         return None
 
@@ -891,6 +921,7 @@ with st.sidebar:
     challenge_mode = st.selectbox(
         "Challenge 來源",
         ["VRF 挑戰", "資料集挑戰"],
+        index=1,
         help="資料集挑戰會從 crp_records 抽一筆真實 challenge。",
     )
 
@@ -972,6 +1003,10 @@ def verify_latest_response(threshold):
         return
 
     # 【Phase 1 改進】傳入 Nonce 和 seed_store 以進行重放攻擊檢測
+    expected_response = None
+    if st.session_state.current_dataset_context:
+        expected_response = st.session_state.current_dataset_context.get("response")
+
     verify_result = verify_response_payload(
         challenge=st.session_state.current_challenge,
         response_data=latest_response,
@@ -980,6 +1015,7 @@ def verify_latest_response(threshold):
         nonce=st.session_state.current_nonce,
         seed_store=st.session_state.seed_store,
         seed_timeout=seed_timeout,
+        expected_response=expected_response,
     )
     if verify_result:
         update_verification_state(verify_result, recv_time)
@@ -1066,6 +1102,9 @@ if run_send:
             max_response_time=seed_timeout,
             challenge_source="dataset" if challenge_mode == "資料集挑戰" else "vrf",
             dataset_name=(st.session_state.current_dataset_context or {}).get("dataset_name"),
+            target_device_id=(st.session_state.current_dataset_context or {}).get("device_id"),
+            target_session_id=(st.session_state.current_dataset_context or {}).get("session_id"),
+            target_timestamp=(st.session_state.current_dataset_context or {}).get("timestamp"),
         )
         if sent_ok:
             st.session_state.challenge_sent_time = time.time()
@@ -1111,6 +1150,9 @@ if run_one_click:
                 max_response_time=seed_timeout,
                 challenge_source="dataset",
                 dataset_name=dataset_record.get("dataset_name"),
+                target_device_id=dataset_record.get("device_id"),
+                target_session_id=dataset_record.get("session_id"),
+                target_timestamp=dataset_record.get("timestamp"),
             )
             if sent_ok:
                 st.session_state.challenge_sent_time = time.time()

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Phase 1 Functional Test - Simulates complete authentication flow
-Tests all 5 scenarios from TEST_PHASE1_REPLAY.md
+Tests five replay-related scenarios in one script run
 """
 import sys
 import time

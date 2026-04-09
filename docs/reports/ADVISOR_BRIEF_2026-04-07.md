@@ -24,6 +24,36 @@
 2. 補完整 FAR/FRR/EER 曲線與 threshold 掃描結論。
 3. 補論文 baseline 對照表與可重現 benchmark。
 
+## 下週三張量化圖（必交）
+1. ROC + EER 定位圖
+- 橫軸 FAR、縱軸 1-FRR，標示 FAR=FRR 的交點。
+- 目前輸出：`artifacts/roc_eer_plot.png`
+- 本輪量測（batch_test_report.json）：EER ≈ 0.020（FAR=0.000, FRR=0.040, T=45）。
+
+2. HD 分佈圖（Intra vs Inter）
+- 同圖比較 Intra-HD 與 Inter-HD，並標示目前觀察到的誤差區間。
+- 目前輸出：`artifacts/hd_distribution_hist.png`
+- 本輪量測（samples=1000）：
+	- Intra/Genuine：mean=15.50, std=6.49
+	- Inter/Impostor：mean=128.52, std=7.75
+	- T_normal=35（FRR=0.021, FAR=0.000）
+
+3. 認證延遲分解圖
+- 拆解 Network、HMAC、DB Query、HD Compare 四段耗時。
+- 目前輸出：`artifacts/latency_breakdown.png`
+- 本輪量測（samples=120，ms）：
+	- Network RTT: mean=523.301, p95=563.921
+	- HMAC: mean=0.002, p95=0.003
+	- DB Query: mean=13.092, p95=13.697
+	- HD Compare: mean=0.001, p95=0.002
+
+## 本輪可交付檔案
+1. `artifacts/roc_eer_plot.png`
+2. `artifacts/hd_distribution_hist.png`
+3. `artifacts/latency_breakdown.png`
+4. `artifacts/latency_breakdown.json`
+5. `artifacts/latency_breakdown.csv`
+
 ## 簡短口頭回報建議
 - 我們已先把系統做成可研究、可追溯，不再只是展示介面。
 - 現在每筆資料可分辨 real/simulated，也能匯入開源資料做統一流程驗證。
@@ -37,6 +67,7 @@
 ## 真實性聲明
 - 目前是「模擬 + 開源資料接軌」混合狀態。
 - 不宣稱已完成硬體端完整閉環，避免過度包裝結果。
+- 本系統目前以公開資料集進行系統層驗證，實體板子直接對接與完整硬體閉環為下一階段目標。
 
 
 
