@@ -413,6 +413,21 @@ def _normalize_hex(value):
     return normalized
 
 
+def classify_data_source(source_value):
+    """Map raw source field to a user-facing data source label."""
+    source = (source_value or "").strip().lower()
+    if source == "real":
+        return "Dataset-Offline"
+    if source == "simulated":
+        return "Simulated"
+    return "Unknown"
+
+
+def classify_pipeline_source(is_batch_value):
+    """Batch scripts are treated as offline; interactive auth is live pipeline."""
+    return "Dataset-Offline" if int(is_batch_value or 0) == 1 else "Live-Pipeline"
+
+
 def calculate_hamming_distance(s1, s2):
     """
     計算兩個 Hex 字串之間的漢明距離
@@ -815,6 +830,9 @@ def verify_response_payload(
         "response": response,
         "corrected_response": corrected_response,
         "privacy_amplification_hash": privacy_amplification_hash,
+        "source": response_data.get("source", "simulated") if isinstance(response_data, dict) else "simulated",
+        "dataset_name": response_data.get("dataset_name") if isinstance(response_data, dict) else None,
+        "is_batch": 0,
     }
 
 
@@ -1223,6 +1241,17 @@ if latest_result:
     else:
         st.error("認證失敗：距離超過門檻")
 
+    label_col1, label_col2 = st.columns(2)
+    with label_col1:
+        st.caption(f"Pipeline Source: {classify_pipeline_source(latest_result.get('is_batch', 0))}")
+    with label_col2:
+        source_label = classify_data_source(latest_result.get("source", "simulated"))
+        dataset_name = latest_result.get("dataset_name")
+        if dataset_name:
+            st.caption(f"Data Source: {source_label} ({dataset_name})")
+        else:
+            st.caption(f"Data Source: {source_label}")
+
     if latest_result.get("privacy_amplification_hash"):
         st.caption(
             f"隱私放大 SHA-256：{latest_result['privacy_amplification_hash']}"
@@ -1246,6 +1275,10 @@ with info_left:
 with info_right:
     st.markdown("### 最新 Response")
     if latest_resp is not None:
+        if isinstance(latest_resp, dict):
+            response_source = classify_data_source(latest_resp.get("source", "simulated"))
+            st.caption(f"Data Source: {response_source}")
+            st.caption("Pipeline Source: Live-Pipeline")
         st.json(latest_resp)
     else:
         st.info("尚未收到 Response")
@@ -1353,18 +1386,43 @@ with tab_history:
     with f3:
         filter_result = st.selectbox("篩選結果", ["全部", "pass", "fail"], key="history_result")
     with f4:
-        filter_source = st.selectbox("資料來源", ["全部", "real", "simulated"], key="history_source")
+        filter_source = st.selectbox("資料來源", ["全部", "Dataset-Offline", "Live-Pipeline", "Simulated"], key="history_source")
 
     df = get_auth_history(limit=limit)
     if not df.empty:
+        if "source" in df.columns:
+            df["data_source_label"] = df["source"].apply(classify_data_source)
+        else:
+            df["data_source_label"] = "Unknown"
+
+        if "is_batch" in df.columns:
+            df["pipeline_label"] = df["is_batch"].apply(classify_pipeline_source)
+        else:
+            df["pipeline_label"] = "Live-Pipeline"
+
         if filter_device != "全部":
             df = df[df["device_id"] == filter_device]
         if filter_result != "全部":
             df = df[df["result"] == filter_result]
-        if filter_source != "全部" and "source" in df.columns:
-            df = df[df["source"] == filter_source]
+        if filter_source != "全部":
+            df = df[(df["data_source_label"] == filter_source) | (df["pipeline_label"] == filter_source)]
 
-        st.dataframe(df, use_container_width=True)
+        preferred_cols = [
+            "timestamp",
+            "device_id",
+            "result",
+            "hamming_distance",
+            "threshold",
+            "pipeline_label",
+            "data_source_label",
+            "dataset_name",
+            "source",
+        ]
+        display_cols = [col for col in preferred_cols if col in df.columns]
+        if display_cols:
+            st.dataframe(df[display_cols], use_container_width=True)
+        else:
+            st.dataframe(df, use_container_width=True)
         csv_data = df.to_csv(index=False)
         st.download_button(
             label=" 下載 CSV",
@@ -1421,6 +1479,25 @@ IPC Files: challenge_out.json / response_in.json / bridge_status.json
 """.strip(),
             language="text",
         )
+
+    st.markdown("### 研究量化圖表（口試展示）")
+    st.caption("Data Source: Dataset-Offline")
+    st.caption("Pipeline Source: Live-Pipeline（門檻與流程驗證）；Dataset-Offline（統計量化）")
+
+    chart_specs = [
+        ("ROC + EER", os.path.join("artifacts", "roc_eer_plot.png")),
+        ("HD Distribution", os.path.join("artifacts", "hd_distribution_hist.png")),
+        ("Latency Breakdown", os.path.join("artifacts", "latency_breakdown.png")),
+    ]
+
+    chart_cols = st.columns(3)
+    for idx, (title, chart_path) in enumerate(chart_specs):
+        with chart_cols[idx]:
+            st.markdown(f"**{title}**")
+            if os.path.exists(chart_path):
+                st.image(chart_path, use_container_width=True)
+            else:
+                st.info(f"尚未找到圖表：{chart_path}")
 
 st.markdown("---")
 st.caption("IoT 硬體指紋認證系統 - 簡化介面版")
