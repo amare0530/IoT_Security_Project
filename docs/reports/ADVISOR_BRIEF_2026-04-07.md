@@ -35,6 +35,31 @@
 - 目前輸出：`artifacts/roc_eer_plot.png`
 - 本輪量測（batch_test_report.json）：EER ≈ 0.020（FAR=0.000, FRR=0.040, T=45）。
 
+### ROC 優先策略（先跟老師定調）
+我們先把 ROC 當作主圖，因為它直接決定門檻 $T$ 的選擇，並且能把 Offline 與 Live 路徑串起來。
+
+1. 樣本定義
+- Genuine：合法配對（同裝置/正確 response）。
+- Impostor：非合法配對（異裝置或錯誤 response）。
+
+2. 門檻掃描
+- 判定規則：$HD \le T$ 視為通過。
+- 對每個 $T$ 計算 FAR 與 FRR。
+
+3. 指標定義
+- $FAR(T)=\frac{\text{Impostor 被接受數}}{\text{Impostor 總數}}$
+- $FRR(T)=\frac{\text{Genuine 被拒絕數}}{\text{Genuine 總數}}$
+- ROC 繪圖採 $(x,y)=(FAR,1-FRR)$。
+
+4. EER 解讀
+- $EER$ 為 FAR 與 FRR 最接近的操作點。
+- 本輪結果 EER 約 0.020，代表在真實雜訊條件下仍維持可用分離度。
+
+5. Offline -> Live 連動說法
+- Offline ROC/EER：決定候選門檻區間（統計信度）。
+- Live Pipeline：驗證該門檻在即時流程下是否穩定（工程效度）。
+- 定調：兩條路徑分工不同，但門檻策略一致，不是兩套互相矛盾的系統。
+
 2. HD 分佈圖（Intra vs Inter）
 - 同圖比較 Intra-HD 與 Inter-HD，並標示目前觀察到的誤差區間。
 - 目前輸出：`artifacts/hd_distribution_hist.png`
@@ -64,10 +89,31 @@
 - 現在每筆資料可分辨 Dataset-Offline / Live-Pipeline / Simulated，也能匯入開源資料做統一流程驗證。
 - 下一階段是把 live 路徑改成真實資料驅動，並交付 FAR/FRR/EER 與論文 baseline 對照。
 
+## ROC 防追問口試稿（可直接使用）
+Q1. 你這張 ROC 是即時系統跑出來的嗎？
+- A：ROC/EER 來自 Dataset-Offline 的批次統計，用來建立門檻的統計信度；即時系統負責驗證流程可行性與延遲表現。
+
+Q2. 為什麼不是只報一個準確率？
+- A：準確率會被資料不平衡影響；ROC 與 EER 可以同時呈現 FAR/FRR 權衡，更適合安全系統評估。
+
+Q3. 你怎麼把離線結果用在即時系統？
+- A：先用 ROC 找候選門檻區間，再在 Live-Pipeline 驗證該門檻的誤拒率與延遲，保持同一門檻策略跨場景一致。
+
 ## 這週可展示操作
 1. `real_data_ingest.py --validate-only` 驗證資料格式。
 2. 匯入資料後確認 `crp_records` 有新增紀錄。
 3. 在 app 歷史頁用 `source` 篩選 real/simulated。
+
+## 會前 5 分鐘重跑（ROC 優先）
+1. 重新產生批次統計
+- `python batch_test.py`
+
+2. 重新繪製 ROC 圖
+- `python plot_roc.py`
+
+3. 確認輸出檔存在
+- `artifacts/batch_test_report.json`
+- `artifacts/roc_eer_plot.png`（口試主圖）
 
 ## 真實性聲明
 - 目前是「模擬 + 開源資料接軌」混合狀態。
