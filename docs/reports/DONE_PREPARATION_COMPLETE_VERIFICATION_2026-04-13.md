@@ -8,42 +8,42 @@
 You now have a complete meeting preparation system with 9 documents:
 
 ### Quick Access Files
-1. **MEETING_PREP_START_HERE.md** (in project root)
+1. **DONE_MEETING_PREP_START_HERE_2026-04-13.md** (in docs/reports)
    - Your entry point - open this first
    - Choose 5-min, 30-min, or 60-min preparation path
 
 ### Core Preparation Documents (in docs/reports/)
-2. **ADVISOR_MEETING_2026-04-13_SUMMARY.md**
+2. **DONE_ADVISOR_MEETING_2026-04-13_SUMMARY.md**
    - Complete meeting structure and narrative
    - System architecture explanation
    - 6 anticipated questions with answers
    
-3. **NATURE_2023_DATASET_UNDERSTANDING.md**
+3. **DONE_NATURE_2023_DATASET_UNDERSTANDING.md**
    - Deep technical explanation of your dataset
    - Threat model and statistics
    
-4. **POST_MEETING_RESEARCH_TRACK_PLAN.md**
+4. **DONE_POST_MEETING_RESEARCH_TRACK_PLAN.md**
    - 4-week research plan with specific tasks
    - Time budgets and deliverables
    
-5. **MEETING_QUICK_REFERENCE_CARD.md**
+5. **DONE_MEETING_QUICK_REFERENCE_CARD.md**
    - 5 numbers to memorize
    - 6 killer 30-50 second answers
    
-6. **PRE_MEETING_FINAL_CHECKLIST.md**
+6. **DONE_PRE_MEETING_FINAL_CHECKLIST.md**
    - Night-before verification checklist
    - Code syntax verified ✓
    - Emergency scenarios covered
    
-7. **README_MEETING_PREP.md**
+7. **DONE_README_MEETING_PREP.md**
    - Navigation hub for all materials
    - Time-based selection guide
    
-8. **KEY_QUESTIONS_TO_CONFIRM_WITH_ADVISOR.md**
+8. **DONE_KEY_QUESTIONS_TO_CONFIRM_WITH_ADVISOR.md**
    - 10 critical questions to ask your advisor
    - Priority levels and recording template
    
-9. **ONE_PAGE_SUMMARY.md**
+9. **DONE_ONE_PAGE_SUMMARY.md**
    - Printable single-page reference
    - For quick in-meeting lookup
 
@@ -63,16 +63,16 @@ You now have a complete meeting preparation system with 9 documents:
 ## 🚀 How to Use This System
 
 ### Scenario 1: You have 5 minutes NOW
-→ Open `MEETING_PREP_START_HERE.md` → Choose 5-min path → Read `MEETING_QUICK_REFERENCE_CARD.md`
+→ Open `DONE_MEETING_PREP_START_HERE_2026-04-13.md` → Choose 5-min path → Read `DONE_MEETING_QUICK_REFERENCE_CARD.md`
 
 ### Scenario 2: You have 30 minutes today
-→ Follow the 30-min path in `MEETING_PREP_START_HERE.md`
+→ Follow the 30-min path in `DONE_MEETING_PREP_START_HERE_2026-04-13.md`
 
 ### Scenario 3: You want complete preparation
-→ Open `README_MEETING_PREP.md` and follow the full reading plan
+→ Open `DONE_README_MEETING_PREP.md` and follow the full reading plan
 
 ### Scenario 4: During the meeting tomorrow
-→ Have `ONE_PAGE_SUMMARY.md` printed or screenshotted as a pocket reference
+→ Have `DONE_ONE_PAGE_SUMMARY.md` printed or screenshotted as a pocket reference
 
 ---
 
@@ -96,7 +96,7 @@ You now have a complete meeting preparation system with 9 documents:
 
 ## 🎯 Your Next Action
 
-Open this file's parent directory: `docs/reports/MEETING_PREP_START_HERE.md`
+Open this file's parent directory: `docs/reports/DONE_MEETING_PREP_START_HERE_2026-04-13.md`
 
 That's it. Everything else flows from there.
 

@@ -6,7 +6,7 @@
 ## 📖 快速開始（選擇你需要的）
 
 ### 🔥 「我只有 5 分鐘，趕緊告訴我怎麼辦」
-👉 **打開這個**: [MEETING_QUICK_REFERENCE_CARD.md](./MEETING_QUICK_REFERENCE_CARD.md)
+👉 **打開這個**: [DONE_MEETING_QUICK_REFERENCE_CARD.md](./DONE_MEETING_QUICK_REFERENCE_CARD.md)
 - 5 個核心數字
 - 6 個問題的 30-50 秒回答
 - 應急方案
@@ -15,22 +15,22 @@
 
 ### 📋 「我想完整準備，有 30 分鐘」
 👉 **按這個順序讀**:
-1. [ADVISOR_MEETING_2026-04-13_SUMMARY.md](./ADVISOR_MEETING_2026-04-13_SUMMARY.md) (15 min)
+1. [DONE_ADVISOR_MEETING_2026-04-13_SUMMARY.md](./DONE_ADVISOR_MEETING_2026-04-13_SUMMARY.md) (15 min)
    - 完整的系統架構說明
    - 四層遞進式論點
    - 為什麼你的做法重要
 
-2. [NATURE_2023_DATASET_UNDERSTANDING.md](./NATURE_2023_DATASET_UNDERSTANDING.md) (10 min)
+2. [DONE_NATURE_2023_DATASET_UNDERSTANDING.md](./DONE_NATURE_2023_DATASET_UNDERSTANDING.md) (10 min)
    - 快速版：讀「📋 核心概念理解」與「🎯 你應該知道的三個統計量」
 
-3. [MEETING_QUICK_REFERENCE_CARD.md](./MEETING_QUICK_REFERENCE_CARD.md) (5 min)
+3. [DONE_MEETING_QUICK_REFERENCE_CARD.md](./DONE_MEETING_QUICK_REFERENCE_CARD.md) (5 min)
    - 背下 5 個數字
    - 練習 3 個必殺句
 
 ---
 
 ### 🔬 「我想深入理解 Nature 數據」
-👉 **全部讀這個**: [NATURE_2023_DATASET_UNDERSTANDING.md](./NATURE_2023_DATASET_UNDERSTANDING.md)
+👉 **全部讀這個**: [DONE_NATURE_2023_DATASET_UNDERSTANDING.md](./DONE_NATURE_2023_DATASET_UNDERSTANDING.md)
 - CRP 的精確定義
 - Modeling Attack 的威脅模型
 - BER / Uniqueness / Reliability 的統計解釋
@@ -39,7 +39,7 @@
 ---
 
 ### 📅 「會議之後，我要開始研究」
-👉 **打開這個**: [POST_MEETING_RESEARCH_TRACK_PLAN.md](./POST_MEETING_RESEARCH_TRACK_PLAN.md)
+👉 **打開這個**: [DONE_POST_MEETING_RESEARCH_TRACK_PLAN.md](./DONE_POST_MEETING_RESEARCH_TRACK_PLAN.md)
 - Week-by-week 的具體任務
 - 時間預算精確到分鐘
 - P0/P1/P2 優先級清晰
@@ -48,7 +48,7 @@
 ---
 
 ### ✅ 「會議前夜，我要最後確認」
-👉 **完整檢查**: [PRE_MEETING_FINAL_CHECKLIST.md](./PRE_MEETING_FINAL_CHECKLIST.md)
+👉 **完整檢查**: [DONE_PRE_MEETING_FINAL_CHECKLIST.md](./DONE_PRE_MEETING_FINAL_CHECKLIST.md)
 - 代碼語法驗證（已完成 ✓）
 - 知識準備檢查清單
 - 現場演示方案 (3 種情景)
