@@ -1,9 +1,0 @@
-[browser]
-gatherUsageStats = false
-
-[client]
-showErrorDetails = "none"
-toolbarMode = "minimal"
-
-[runner]
-fastReruns = true

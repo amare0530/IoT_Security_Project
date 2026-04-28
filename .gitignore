@@ -1,29 +1,19 @@
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
-
-# Local virtual environments (machine-specific)
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
 .venv/
 venv/
 
-# Local IDE and app settings (machine-specific)
-.vscode/
-.streamlit/
-
-# Test/cache outputs
-.pytest_cache/
+# Data and artifacts
+artifacts/
 *.log
 
-# Runtime status artifacts
-bridge_status.json
-challenge_out.json
-response_in.json
-authentication_history.db
-
-# Experiment and plotting outputs
-artifacts/
-batch_test_report.json
-batch_test_results.csv
-sensitivity_analysis.csv
-sensitivity_analysis.json
-roc_curve.png
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json

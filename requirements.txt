@@ -1,14 +1,4 @@
-# Core runtime
-streamlit==1.54.0
-paho-mqtt==2.1.0
-pandas==2.2.3
-numpy==1.26.4
-matplotlib==3.8.4
-
-# Streamlit frontend compatibility
-altair==5.5.0
-pydeck==0.9.0
-watchdog==6.0.0
-
-# Testing
-pytest==8.3.5
+numpy>=1.26
+pandas>=2.2
+paho-mqtt>=2.1
+pytest>=8.2
