@@ -52,50 +52,70 @@ def parse_args() -> argparse.Namespace:
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
+
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
         raise ValueError(f"Missing columns: {sorted(missing)}")
-    df = df.copy()
-    df["uid"] = df["uid"].astype(str)
+
+    df["uid"] = df["uid"].astype("category")  # 節省 RAM
     df["address"] = df["address"].astype(str)
-    df["data"] = df["data"].astype(int)
     df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
+
     if df["created_at"].isna().any():
         raise ValueError("created_at contains invalid datetime values")
-    if ((df["data"] < 0) | (df["data"] > 255)).any():
-        raise ValueError("data must be decimal bytes in range [0, 255]")
+
+    # 直接在 row level 把逗號字串轉成 256-bit 二進位字串，不 explode
+    def row_to_bitstream(data_str: str) -> str:
+        return "".join(format(int(b), "08b") for b in data_str.split(","))
+
+    print("正在轉換 bitstream（row-level，無 explode）...")
+    df["bitstream"] = df["data"].apply(row_to_bitstream)
+
+    # 完整性檢查：每列的 bitstream 長度必須一致（依 uid 分組）
+    bit_lengths = df.groupby("uid", observed=True)["bitstream"].apply(
+        lambda s: s.str.len().unique()
+    )
+    for uid, lengths in bit_lengths.items():
+        if len(lengths) != 1:
+            raise ValueError(f"Inconsistent bitstream length for uid={uid}: {lengths}")
+
+    # data 欄位已不需要，釋放記憶體
+    df = df.drop(columns=["data"])
+
     return df.sort_values(["uid", "created_at", "address"]).reset_index(drop=True)
 
 
-def byte_to_bits(value: int) -> str:
-    return format(int(value), "08b")
-
-
 def add_bitstream_columns(df: pd.DataFrame) -> pd.DataFrame:
+    # bitstream 已在 load_dataset 建立，這裡只補 sample_index
     out = df.copy()
-    out["byte_bits"] = out["data"].map(byte_to_bits)
-    out["sample_index"] = out.groupby("uid").cumcount()
-    out["bitstream"] = out.groupby(["uid", "sample_index"])["byte_bits"].transform(
-        "".join
-    )
+    out["sample_index"] = out.groupby("uid", observed=True).cumcount()
     return out
 
 
 def sample_level_bit_matrix(df: pd.DataFrame) -> Dict[str, np.ndarray]:
     matrices: Dict[str, np.ndarray] = {}
+
     samples = (
-        df.groupby(["uid", "sample_index"], as_index=False)
-        .agg({"bitstream": "first"})
+        df.groupby(["uid", "sample_index"], observed=True)["bitstream"]
+        .first()
+        .reset_index()
         .sort_values(["uid", "sample_index"])
     )
-    for uid, group in samples.groupby("uid"):
+
+    for uid, group in samples.groupby("uid", observed=True):
         bitstreams = group["bitstream"].tolist()
         if not bitstreams:
             continue
+
         bit_len = len(bitstreams[0])
         if any(len(b) != bit_len for b in bitstreams):
             raise ValueError(f"Inconsistent bitstream length for uid={uid}")
-        matrices[uid] = np.array([[int(ch) for ch in row] for row in bitstreams], dtype=np.uint8)
+
+        # frombuffer 比 list comprehension 快 3-5 倍
+        matrices[str(uid)] = np.frombuffer(
+            "".join(bitstreams).encode(), dtype=np.uint8
+        ).reshape(len(bitstreams), bit_len) - ord("0")
+
     return matrices
 
 
@@ -144,7 +164,9 @@ def build_masks(summary: pd.DataFrame, thresholds: Iterable[float]) -> List[dict
     return result
 
 
-def _split_train_holdout(matrix: np.ndarray, holdout_ratio: float, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+def _split_train_holdout(
+    matrix: np.ndarray, holdout_ratio: float, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
     n = matrix.shape[0]
     if n < 2:
         raise ValueError("At least 2 samples per UID are required for holdout BER estimation")
@@ -158,7 +180,10 @@ def _split_train_holdout(matrix: np.ndarray, holdout_ratio: float, rng: np.rando
 
 
 def threshold_comparison(
-    matrices: Dict[str, np.ndarray], thresholds: Iterable[float], holdout_ratio: float, seed: int
+    matrices: Dict[str, np.ndarray],
+    thresholds: Iterable[float],
+    holdout_ratio: float,
+    seed: int,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     rows: List[dict] = []
@@ -217,9 +242,9 @@ def main() -> None:
     comparison.to_csv(args.output_dir / "threshold_comparison.csv", index=False)
 
     print("Saved:")
-    print(f"- {args.output_dir / 'stability_summary.csv'}")
-    print(f"- {args.output_dir / 'masks.json'}")
-    print(f"- {args.output_dir / 'threshold_comparison.csv'}")
+    print(f"  {args.output_dir / 'stability_summary.csv'}")
+    print(f"  {args.output_dir / 'masks.json'}")
+    print(f"  {args.output_dir / 'threshold_comparison.csv'}")
 
 
 if __name__ == "__main__":

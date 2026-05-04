@@ -44,3 +44,7 @@ Outputs:
 
 ## Next Step
 Use `artifacts/masks.json` as the core input for fuzzy extractor and authentication experiments.
+
+## Paper-Ready Docs
+- Architecture: `docs/ARCHITECTURE_PAPER_STYLE.md`
+- Experiment flow: `docs/EXPERIMENT_FLOW.md`
