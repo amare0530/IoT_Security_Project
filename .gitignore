@@ -8,10 +8,9 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
-
-# Data and artifacts
-artifacts/
-*.log
+artifacts/*.csv
+artifacts/*.log
+# 不要寫整行 artifacts/，這樣才能留住 json 檔
 
 # OS/editor
 .DS_Store
@@ -19,3 +18,4 @@ Thumbs.db
 .vscode/settings.json
 data/*.csv
 artifacts/*.csv
+artifacts/*.json
