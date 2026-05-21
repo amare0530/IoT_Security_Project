@@ -1,116 +1,170 @@
 ﻿# WASN 2026 Paper Draft
 
-## Paper Type And Target
+## What This Draft Is
 
-This draft is intended for a Taiwanese academic conference paper written in IEEE-style English while following the conference template layout.
+This file is the working paper draft for MC 2026 & WASN 2026. The intended submission is an English conference paper in the local conference template, with IEEE-style wording and a realistic length of 4 to 5 pages.
 
-Target length: 4 to 5 pages.
+The draft is written from the current repository state, not from an idealized future system. The current implementation validates the SRAM-PUF-to-MQTT authentication pipeline with dataset-derived keys. It does not yet perform live SRAM sampling on an ESP32 during runtime.
 
-Reasoning:
-
-- 2 pages is too short for architecture, implementation, security analysis, and evaluation.
-- 6 to 8 pages would require deeper related work, physical deployment, power analysis, and latency benchmarking.
-- 4 to 5 pages is realistic for the current project: the pipeline is implemented, evaluation artifacts exist, and the remaining work is to present the system clearly and honestly.
-
-## Format Checklist
+## Format Reminder
 
 | Item | Requirement |
 | --- | --- |
 | Paper size | A4 |
 | Layout | Two columns, single spacing |
 | Maximum length | 8 pages |
+| Recommended length | 4 to 5 pages |
 | Paper title | 16 pt bold, centered |
 | Authors, affiliation, email | 12 pt, centered |
 | Section titles | 12 pt bold, centered |
 | Body text | 10 pt Times New Roman |
 | Figure caption | Below figure |
 | Table caption | Above table |
-| Final submission | Word and PDF |
+| Submission files | Word and PDF |
 
 ## Recommended Title
 
 A Reliability-Aware SRAM PUF and HMAC Authentication Pipeline for Resource-Constrained IoT Devices
 
-Alternative shorter title:
+Shorter alternative:
 
 Reliability-Aware SRAM PUF Authentication for Resource-Constrained IoT Devices over MQTT
 
-Why the recommended title is better:
+## English Abstract
 
-- It states the real contribution: reliability-aware preprocessing plus authentication pipeline.
-- It avoids overstating novelty.
-- It is specific enough for WASN because it includes IoT device authentication.
-- It does not sound like a generic implementation report.
+IoT edge devices deployed in unattended environments face a practical risk: authentication credentials stored in flash memory may be extracted if an attacker gains physical access to the device. This paper presents a reliability-aware authentication pipeline that uses SRAM startup behavior to reconstruct device-specific key material instead of relying only on persistent key storage. The system operates in two phases. During offline enrollment, repeated SRAM startup responses from each device are analyzed to identify stable bit positions, generate a device-specific mask, and produce a PUF-assisted key record through a fuzzy extractor. During online authentication, the device uses the reconstructed or registered PUF-derived key to compute an HMAC-SHA256 response for an MQTT challenge containing a nonce and timestamp. Experiments on a dataset of 84 devices show an average bit stability of 0.9697, with at least 513,910 stable bits available per device at the 0.90 threshold. The fuzzy extractor achieves 100% key reconstruction in the no-noise setting and 99.864% average success under random 5% bit-error simulation across 81 devices. An MQTT prototype validates end-to-end authentication using keys generated from the dataset artifacts. The current implementation is a system-level prototype; live SRAM sampling on physical hardware and helper-data leakage analysis remain future work.
 
-## Refined Abstract
+Approximate length: 209 words.
 
-With the rapid deployment of Internet of Things (IoT) applications, edge devices are increasingly exposed to physical tampering and identity impersonation while operating under limited computational resources. Conventional authentication schemes often rely on long-term keys stored in non-volatile memory, which may be vulnerable to extraction once a device is physically accessed. This paper presents a reliability-aware lightweight authentication pipeline based on Static Random-Access Memory Physical Unclonable Functions (SRAM PUFs) and HMAC-SHA256. The proposed design separates the system into an offline enrollment phase and an online authentication phase. During enrollment, repeated SRAM startup responses are analyzed to identify stable bit positions, generate device-specific masks, and derive key material through a fuzzy extractor. During authentication, the device uses the PUF-derived key to complete an MQTT-based challenge-response protocol with nonce and timestamp protection. Experiments on an SRAM PUF dataset containing 84 devices show an average bit stability of 0.9697. The fuzzy extractor achieves 100% reconstruction success without injected noise and 99.864% average success under random 5% bit-error simulation. The MQTT prototype further validates end-to-end authentication using generated PUF-derived keys. The results suggest that combining reliability-aware preprocessing, fuzzy extraction, and lightweight message authentication is a practical direction for resource-constrained IoT device authentication, while helper-data leakage and live hardware deployment remain important future work.
+## 中文摘要草稿
 
-Approximate length: 219 words.
+部署於無人看管環境的物聯網邊緣設備面臨一個實際風險：若攻擊者取得設備實體存取權，儲存在快閃記憶體中的認證憑證可能遭到提取。本文提出一套可靠度感知認證流程，利用 SRAM 開機行為重建設備專屬金鑰材料，以降低對永久儲存金鑰的依賴。系統分為兩個階段：離線註冊階段分析每台設備的多次 SRAM 開機回應，挑選穩定位元、產生設備專屬遮罩，並透過 fuzzy extractor 產生 PUF-assisted key record；線上認證階段則使用重建或註冊後的 PUF-derived key，針對包含 nonce 與 timestamp 的 MQTT challenge 計算 HMAC-SHA256 回應。實驗資料涵蓋 84 台設備，平均 bit stability 為 0.9697，在 0.90 門檻下每台設備至少有 513,910 個穩定位元。Fuzzy extractor 在無雜訊情境下達到 100% 金鑰重建成功率，並在 81 台設備的隨機 5% 位元錯誤模擬中達到 99.864% 平均成功率。MQTT prototype 驗證了使用資料集 artifacts 產生之金鑰完成端到端認證的可行性。目前實作屬於系統層級 prototype，實體硬體上的即時 SRAM 取樣與 helper-data leakage 分析仍為未來工作。
 
 ## Keywords
 
-SRAM PUF, IoT Security, HMAC-SHA256, MQTT, Device Authentication
+SRAM PUF, Fuzzy Extractor, HMAC-SHA256, MQTT, IoT Authentication
 
-## Estimated Final Page Allocation
+## Final Page Plan
 
-| Page | Content | Notes |
+| Page | Content | Figure/Table |
 | --- | --- | --- |
-| 1 | Title, authors, abstract, keywords, I. Introduction | Keep Introduction short and focused. |
-| 2 | II. Proposed Architecture + Figure 1 | Use the system architecture diagram here. |
-| 3 | III. Implementation + IV. Security Analysis | Use concise paragraphs, not long textbook explanation. |
-| 4 | V. Evaluation + tables + VI. Conclusion | Use 2 compact tables, maybe 1 plot. |
-| 5 optional | References or extra figure/table | Use only if Word layout becomes too tight. |
+| 1 | Title, authors, abstract, keywords, I. Introduction | None or very small overview if space allows |
+| 2 | II. Proposed Architecture | Figure 1 system architecture |
+| 3 | III. System Implementation, IV. Security Analysis | Figure 2 sequence flow |
+| 4 | V. Evaluation, VI. Conclusion | Table 1 and Table 2 |
+| 5 optional | References or extra plot | Inter-HD distribution if space allows |
 
-## Suggested Figures And Tables
+---
 
-### Figure 1. System Architecture
+# Paper Body
 
-Place in Section II, near the first paragraph.
+## I. Introduction
 
-Recommended components:
+IoT systems often rely on small edge devices that are inexpensive, resource-constrained, and physically exposed. In this setting, device authentication cannot assume that every node is protected inside a trusted data center. A sensor node installed in a classroom, factory, or outdoor environment may be inspected, removed, or copied. If its long-term authentication key is stored directly in flash memory or a configuration file, physical access can become a path to credential extraction and device impersonation.
 
-- IoT Device
-- SRAM PUF response source
-- Stable-bit mask
-- Fuzzy Extractor
-- PUF-derived key
-- MQTT Broker
-- Authentication Server
-- Key/helper-data registry or enrollment database
+Physical Unclonable Functions (PUFs) offer a different way to think about device identity. Instead of storing a fixed digital secret, a PUF uses manufacturing variations to produce device-specific responses. SRAM PUFs are attractive for low-cost IoT devices because SRAM is already present in many microcontrollers, and its power-up state can be treated as a hardware fingerprint. The difficulty is that SRAM responses are not perfectly stable. Bit values may change across power cycles because of temperature, voltage, aging, or measurement noise. Raw SRAM output is therefore not suitable as a cryptographic key without preprocessing and reconstruction support.
 
-Caption suggestion:
+This work studies a practical authentication pipeline built around that constraint. The system first analyzes repeated SRAM startup responses offline, selects stable bit positions, and uses a fuzzy extractor to generate reconstructable key material. The online path is intentionally lightweight: an authentication server sends an MQTT challenge containing a nonce and timestamp, and the device answers with an HMAC-SHA256 tag computed from the PUF-derived key. The goal is not to claim a complete hardware security product, but to validate the engineering path from noisy SRAM PUF data to lightweight IoT authentication.
 
-Figure 1. Overview of the proposed reliability-aware SRAM PUF authentication pipeline.
+The contributions are:
 
-### Figure 2. MQTT Challenge-Response Flow
+- A two-phase SRAM PUF authentication pipeline that separates offline reliability analysis from online MQTT authentication.
+- A stable-bit selection and fuzzy-extractor workflow that turns noisy SRAM startup responses into reconstructable key material.
+- An HMAC-SHA256 challenge-response prototype with timestamp validation and nonce reuse protection.
+- An evaluation using project artifacts, including bit stability, fuzzy-extractor reconstruction, inter-device Hamming distance, and MQTT integration logs.
 
-Place in Section II-B or Section III.
+## II. Proposed Architecture
 
-Recommended sequence:
+The architecture follows the data path used in the implementation: SRAM measurements are processed into stable positions, stable positions are used by the fuzzy extractor, and the resulting key material is consumed by an MQTT authentication protocol. This separation matters because the expensive and data-heavy work happens before deployment, while the online device only needs the lightweight operations required for challenge response.
 
-1. Server publishes challenge with UID, nonce, and timestamp.
-2. Device reconstructs or retrieves the PUF-derived key.
-3. Device computes HMAC-SHA256 over UID, nonce, and timestamp.
-4. Device publishes authentication response through MQTT.
-5. Server verifies pending challenge, timestamp, nonce reuse, and HMAC value.
+[Place Figure 1 here: Overview of the reliability-aware SRAM PUF enrollment and MQTT authentication pipeline.]
 
-Caption suggestion:
+### A. Offline Enrollment
 
-Figure 2. MQTT-based HMAC challenge-response authentication flow.
+Enrollment begins with repeated SRAM startup measurements. Each dataset row contains a device identifier (UID), a memory address, response bytes, and a timestamp. The analysis script converts the response bytes into bitstreams and groups measurements by `(UID, timestamp)`, so each timestamp represents one startup sample for a device. Address blocks are sorted and concatenated to form a sample-level bit vector.
 
-### Table 1. Dataset And Fuzzy Extractor Summary
+For each bit position, the system estimates the probability of observing 0 and 1 across repeated samples. The stability score is:
 
-Place in Section V.
+```text
+S_i = max(P_i(0), P_i(1))
+```
 
-Use one combined table to save space.
+The dominant bit is the more frequently observed value. In the current experiments, positions with stability at least 0.90 are selected. This produces a device-specific mask: stable cells are retained, and unstable cells are ignored before reconstruction.
+
+The fuzzy extractor uses the selected stable bits as the response source. Its implementation follows a code-offset style construction with repeated key-bit encoding. During `Gen()`, random enrollment key bits are expanded by repetition, XORed with selected stable response bits to form helper data, and then compressed into a 128-bit HMAC key by hashing the key bits together with the UID. During `Rep()`, a later response and the helper data reconstruct the encoded key bits through XOR and majority voting. This is more precise than saying the key is simply hashed from SRAM bits: SRAM behavior anchors reconstruction, while helper data supports recovery from noise.
+
+The current prototype exports generated PUF-derived keys to `artifacts/fuzzy_extractor_results.csv`. This file is used as a key registry for the MQTT integration test. A stricter hardware deployment should replace that registry lookup with live SRAM response acquisition and device-side `Rep()` reconstruction.
+
+### B. Online Authentication
+
+The online phase authenticates one enrolled UID at a time. The server generates a challenge containing a random nonce and timestamp, then publishes `{UID, nonce, timestamp}` to the MQTT challenge topic. The device subscribes to the challenge topic and ignores messages whose UID does not match its configured identity.
+
+For a matching challenge, the device obtains the corresponding PUF-derived key and computes:
+
+```text
+tag = HMAC-SHA256(K, UID || nonce || timestamp)
+```
+
+In the code, the signed payload is serialized as `uid:nonce:timestamp`. The device publishes a JSON response containing the UID, nonce, timestamp, and HMAC tag to the response topic.
+
+The server accepts a response only if the UID is expected, the response matches the pending challenge, the timestamp is within the configured time window, the nonce has not already been used, and the HMAC tag matches the recomputed value. These checks bind the response to both the enrolled device and the fresh challenge.
+
+## III. System Implementation
+
+The prototype is implemented in Python and is divided into five small modules that mirror the pipeline. `analysis/stability_analysis.py` loads `crps.csv`, validates the required columns, converts byte strings to bitstreams, computes per-bit stability, writes `stability_summary.csv`, and generates `masks.json`. It also estimates holdout BER for threshold comparison. In the current artifact, the aggregate threshold rows are identical across 0.90, 0.95, 0.98, and 0.99; for that reason, the paper uses 0.90 as the working threshold rather than presenting the threshold sweep as a main result.
+
+The PUF logic is implemented in `puf/bit_selection.py` and `puf/fuzzy_extractor.py`. The bit-selection module is intentionally simple: it marks positions whose stability score exceeds the threshold. The fuzzy extractor consumes 2,816 selected bits per device by default, corresponding to 256 key bits with repetition 11. Its majority-vote reconstruction can tolerate a limited number of bit flips per repeated group. The simulation script records no-noise reconstruction, a correctable 5% BER case, and random 5% BER Monte Carlo success rates.
+
+The authentication logic is implemented in `auth/hmac_auth.py`. The `PUFAuthenticator` creates nonce/timestamp challenges, builds the signed payload from UID, nonce, and timestamp, computes HMAC-SHA256, and verifies responses using `hmac.compare_digest()` rather than ordinary string comparison. It also keeps a cache of used nonces and prunes expired entries according to the configured time window.
+
+The MQTT layer is implemented in `mqtt/server.py` and `mqtt/device.py` using the Paho MQTT client. The server publishes challenges and stores the pending challenge per UID. The device listens for challenges, filters by UID, computes the HMAC response, and publishes the result. `puf/key_provider.py` loads the generated key registry, with an optional manual key override for testing.
+
+[Place Figure 2 here: Sequence diagram of the MQTT challenge-response flow.]
+
+Unit tests cover stable-bit selection, fuzzy-extractor reconstruction with noise, HMAC success and failure cases, tampered challenge rejection, expired timestamp rejection, immediate replay rejection, key-registry loading, and MQTT payload roundtrip construction. The Step 6 integration log confirms a successful MQTT authentication run for an enrolled UID using the generated PUF-derived key registry.
+
+## IV. Security Analysis
+
+The prototype addresses authentication and message integrity, not payload confidentiality. This distinction is important: HMAC can prove that a response was generated with the expected key and that authenticated fields were not modified, but it does not hide sensor data. If confidentiality is required, MQTT should be used with TLS or an additional payload-encryption layer.
+
+Replay protection is handled through two mechanisms that work together. The timestamp limits the lifetime of a challenge, and the nonce cache prevents the same challenge from being accepted twice within the valid window. The tests include both an expired-challenge case and an immediate nonce-reuse case.
+
+Message tampering and simple impersonation are rejected by the same HMAC verification step. If an attacker changes the nonce, timestamp, UID, or tag, the server recomputes a different value and rejects the response. Knowing the UID or MQTT topic is therefore insufficient; the attacker must also produce the correct HMAC for the fresh challenge.
+
+The physical-security claim should be stated carefully. The design reduces reliance on a static key stored directly in device memory by tying key reconstruction to SRAM PUF behavior. However, the current Python prototype still uses an exported key registry for integration testing. It should not be described as a finished ESP32 hardware implementation. The stronger claim becomes valid only after live SRAM sampling and on-device reconstruction replace the registry lookup.
+
+Helper data also needs conservative wording. It is public in the fuzzy-extractor model, but public does not mean irrelevant. Its leakage depends on the selected PUF bits, response bias, and extractor construction. The measured Inter-HD is lower than the ideal 0.5, so the paper should not claim ideal PUF uniqueness. Instead, the result motivates the reliability-aware preprocessing and honest future analysis.
+
+## V. Evaluation
+
+The evaluation is based on generated artifacts from the SRAM PUF dataset and the MQTT authentication prototype.
+
+### A. SRAM Stability
+
+The device summary contains 84 devices. Each device has 655,360 bit positions. The average per-device stability is 0.9697, with a minimum average stability of 0.9473 and a maximum of 0.9977. At the 0.90 threshold, each device has at least 513,910 selected stable bits, and the average is 574,655. These numbers show that the dataset contains enough stable positions for the extractor configuration used in the prototype.
+
+### B. Fuzzy-Extractor Reconstruction
+
+The fuzzy extractor processes 81 devices. Each processed device consumes 2,816 selected stable bits. Reconstruction succeeds for all 81 devices in the no-noise case and in the controlled correctable 5% BER case. Under random 5% BER Monte Carlo simulation with 100 trials per device, the average success rate is 99.864%, and the minimum device-level success rate is 98.0%.
+
+### C. Inter-Device Hamming Distance
+
+The inter-device Hamming distance experiment produces 6,480 ordered pairwise comparisons. The mean Inter-HD is 0.2703 with standard deviation 0.0567. This is below the ideal 0.5 expected from unbiased independent identifiers. The result should be reported directly. It suggests dataset bias and supports the decision not to rely on raw SRAM responses alone.
+
+### D. MQTT Authentication
+
+The MQTT integration test uses the key registry generated from fuzzy-extractor outputs. The server publishes challenges for an enrolled UID, and the device returns HMAC responses through the configured MQTT topics. The recorded Step 6 log contains a successful authentication result. This validates the end-to-end software path from generated PUF-derived key material to MQTT-based challenge-response verification.
+
+### Table 1. Dataset and Reconstruction Summary
 
 | Metric | Result |
 | --- | ---: |
-| Devices in dataset summary | 84 |
+| Devices in stability summary | 84 |
 | Bits per device | 655,360 |
 | Mean bit stability | 0.9697 |
-| Mean bits with stability >= 0.90 | 574,655 |
+| Minimum mean bit stability | 0.9473 |
+| Mean selected bits at threshold 0.90 | 574,655 |
+| Minimum selected bits at threshold 0.90 | 513,910 |
 | Devices processed by fuzzy extractor | 81 |
 | Stable bits consumed per device | 2,816 |
 | No-noise reconstruction success | 100.0% |
@@ -118,8 +172,6 @@ Use one combined table to save space.
 | Random 5% BER minimum success | 98.0% |
 
 ### Table 2. Inter-Device Hamming Distance Summary
-
-Place in Section V-C.
 
 | Metric | Result |
 | --- | ---: |
@@ -129,120 +181,71 @@ Place in Section V-C.
 | Maximum Inter-HD | 0.3726 |
 | Standard deviation | 0.0567 |
 
-Important wording:
-
-Do not present Inter-HD as ideal. Say that it is lower than the ideal 0.5 and indicates dataset bias. This makes the paper more credible.
-
-## I. Introduction
-
-The Internet of Things (IoT) has become a common infrastructure for sensing, monitoring, and automation systems. In many IoT deployments, edge devices are placed in distributed or unattended environments and communicate with servers through lightweight protocols such as MQTT [1]. This deployment model introduces a practical security problem: device credentials are often stored as long-term secrets in flash memory, configuration files, or other non-volatile storage. Once an attacker obtains physical access to a device, such stored secrets may be extracted and reused to clone the device identity or forge authentication messages.
-
-Physical Unclonable Functions (PUFs) provide a hardware-oriented alternative to conventional key storage. A PUF derives device-specific responses from manufacturing variations rather than from a permanently stored digital secret. SRAM PUFs are particularly attractive for low-cost IoT devices because SRAM is already available in many microcontrollers and its startup state can be used as a device fingerprint [2]. However, SRAM PUF responses are not perfectly stable. Environmental variations, aging, voltage changes, and measurement noise may introduce bit flips between repeated startups. Therefore, raw SRAM responses usually require reliability-aware preprocessing and error correction before they can be used as cryptographic key material [3], [4].
-
-This paper presents a reliability-aware SRAM PUF authentication pipeline for resource-constrained IoT devices. The proposed system moves expensive response analysis to an offline enrollment phase, where stable bit positions are selected and fuzzy-extractor helper data are generated. During online authentication, the device uses the PUF-derived key to compute an HMAC-SHA256 response [5], [6] for an MQTT challenge containing a nonce and timestamp. This design focuses on lightweight device authentication and message integrity rather than payload encryption.
-
-The main contributions are as follows:
-
-- A two-phase SRAM PUF authentication pipeline that separates offline reliability analysis from lightweight online authentication.
-- A stable-bit selection and fuzzy-extractor workflow that converts noisy SRAM startup responses into usable PUF-derived key material.
-- An MQTT-based HMAC-SHA256 challenge-response prototype with nonce and timestamp replay protection.
-- An evaluation using real project artifacts, including stability analysis, fuzzy-extractor reconstruction results, inter-device Hamming distance, and end-to-end MQTT authentication logs.
-
-## II. Proposed Architecture
-
-The proposed architecture consists of two phases: offline enrollment and online authentication. The offline phase prepares reliable authentication material from SRAM PUF measurements. The online phase uses this material to authenticate an IoT device through a lightweight challenge-response exchange.
-
-### A. Offline Enrollment Phase
-
-During enrollment, repeated SRAM startup responses are collected for each device. Each record contains a device identifier, memory address, response data, and collection timestamp. The system converts the recorded byte values into bitstreams and groups repeated measurements by device. For each bit position, the probability of observing 0 and 1 is computed across repeated startups. The stability score is defined as the larger of the two probabilities. A bit is selected if its stability score is greater than or equal to the configured threshold, producing a device-specific stable-bit mask.
-
-The selected stable bits are then used by the fuzzy extractor. In the current implementation, the extractor uses repeated key-bit encoding and majority-vote reconstruction. The enrollment procedure generates a PUF-derived key and helper data. The helper data is not treated as a secret by itself, but its leakage implications still depend on the entropy and bias of the underlying PUF response. For system integration, the current prototype exports generated PUF-derived keys into a registry used by the MQTT device and server programs.
-
-### B. Online Authentication Phase
-
-During authentication, the server publishes a challenge containing the target device UID, a random nonce, and a timestamp. The device obtains the corresponding PUF-derived key and computes an HMAC-SHA256 tag over the UID, nonce, and timestamp. It then publishes a response containing the UID, nonce, timestamp, and HMAC value. The server accepts the response only if four checks pass: the UID is enrolled, the response matches a pending challenge, the timestamp is within the allowed time window, and the nonce has not been used before.
-
-This design avoids public-key cryptography during the online authentication path. The device-side workload is limited to key reconstruction or key retrieval in the prototype, message formatting, and HMAC computation. The nonce and timestamp prevent simple replay attacks, while the HMAC binds the response to both the device identity and the fresh challenge.
-
-## III. System Implementation
-
-The prototype is implemented in Python and organized into four main components. The analysis component computes per-bit stability and generates stable-bit masks from the SRAM PUF dataset. The PUF component implements stable-bit selection and fuzzy-extractor reconstruction. The authentication component implements HMAC-SHA256 challenge-response verification with timestamp validation, nonce caching, and constant-time digest comparison. The MQTT component implements a device and server pair using the Paho MQTT client.
-
-The authentication tag is computed as:
-
-```text
-tag = HMAC-SHA256(K, UID || nonce || timestamp)
-```
-
-where `K` is the PUF-derived key. On the server side, the same payload is reconstructed from the pending challenge and the expected device UID. The server then recomputes the HMAC and compares it with the received tag. If the HMAC does not match, the timestamp is expired, or the nonce was already used, authentication is rejected.
-
-The Step 6 integration test uses a PUF-derived key registry generated by the fuzzy extractor. This is an important implementation boundary: the prototype validates the complete MQTT authentication loop using keys generated from SRAM PUF processing artifacts, but it does not yet acquire live SRAM startup responses from a physical ESP32 during runtime. In a full deployment, the registry lookup on the device side should be replaced by live SRAM response acquisition and fuzzy-extractor reconstruction.
-
-## IV. Security Analysis
-
-Replay attack resistance: Each challenge includes a fresh nonce and timestamp. The server rejects expired challenges and stores used nonces within the valid time window. Therefore, an attacker cannot simply record a valid response and replay it later.
-
-Message tampering resistance: The HMAC covers the UID, nonce, and timestamp. Any modification to these fields changes the expected tag and causes verification failure. The implementation also uses constant-time comparison for HMAC verification.
-
-Device impersonation resistance: A device must possess the correct PUF-derived key to generate a valid HMAC for a fresh challenge. Therefore, knowing only the UID or MQTT topic is insufficient for impersonation.
-
-Physical key extraction resistance: The design goal is to reduce dependence on permanent secret storage by deriving key material from SRAM PUF behavior. However, the current prototype still uses an exported key registry for integration testing. The final hardware version should reconstruct the key from live SRAM responses and avoid storing plaintext keys on the device.
-
-Limitations: This work focuses on authentication and integrity, not payload confidentiality. MQTT messages should still be protected by TLS or application-layer encryption when sensor data confidentiality is required. In addition, helper data is not a secret, but helper-data leakage must be considered carefully when evaluating the entropy of the selected PUF bits.
-
-## V. Evaluation
-
-The evaluation uses artifacts generated from the SRAM PUF dataset and the MQTT authentication prototype.
-
-### A. SRAM PUF Stability
-
-The dataset summary contains 84 devices, each with 655,360 bit positions. The average per-device bit stability is 0.9697. On average, 574,655 bits per device have stability greater than or equal to 0.90, and the minimum device still contains 513,910 such bits. These results indicate that the dataset provides enough stable positions for reliability-aware key generation.
-
-### B. Fuzzy Extractor Reliability
-
-The fuzzy extractor processed 81 devices and consumed 2,816 selected stable bits per device. Reconstruction succeeds for all processed devices in the no-noise setting. Under random 5% bit-error simulation with 100 trials per device, the average success rate is 99.864%, and the minimum device-level success rate is 98.0%. These results suggest that the selected stable bits and reconstruction method are sufficient for the prototype authentication setting.
-
-### C. Inter-Device Uniqueness
-
-The inter-device Hamming distance experiment produces 6,480 pairwise comparisons. The mean Inter-HD is 0.2703, with a standard deviation of 0.0567. This is lower than the ideal value of 0.5 and indicates bias in the dataset. Therefore, this paper does not claim that the raw SRAM responses are ideal identifiers. Instead, the system uses reliability-aware preprocessing and fuzzy extraction before applying HMAC-based authentication.
-
-### D. MQTT Authentication Feasibility
-
-The MQTT prototype validates the authentication flow using generated PUF-derived keys. The server publishes a challenge to the configured MQTT topic, and the device responds with an HMAC-SHA256 tag. The integration log confirms successful authentication for an enrolled UID. This result verifies the feasibility of combining the PUF-derived key pipeline with MQTT challenge-response authentication.
-
 ## VI. Conclusion
 
-This paper presented a reliability-aware SRAM PUF and HMAC authentication pipeline for resource-constrained IoT devices. The system combines offline stable-bit selection, fuzzy-extractor based key reconstruction, and MQTT-based HMAC-SHA256 challenge-response authentication. Experimental artifacts show high average bit stability, reliable key reconstruction under simulated noise, and successful end-to-end MQTT authentication using generated PUF-derived keys. The current prototype remains a system-level validation rather than a complete hardware deployment. Future work will replace the key registry with live SRAM response acquisition, measure authentication latency on microcontrollers, and analyze helper-data leakage under stronger entropy assumptions.
+This paper presented a reliability-aware SRAM PUF and HMAC authentication pipeline for resource-constrained IoT devices. The implementation starts from repeated SRAM startup measurements, selects stable bit positions, reconstructs PUF-assisted key material with a fuzzy extractor, and uses the resulting key in an MQTT HMAC challenge-response protocol. The evaluation shows high average bit stability, reliable reconstruction under simulated noise, and a working end-to-end MQTT authentication prototype.
 
-## Reviewer-Style Weaknesses To Fix Before Submission
+The current system is best understood as a software prototype that validates the pipeline and its boundaries. It does not yet replace the key registry with live SRAM sampling on physical hardware, and the Inter-HD result shows that the dataset is biased rather than ideal. Future work will focus on live microcontroller integration, latency measurement on constrained devices, and a stronger helper-data leakage analysis.
 
-1. Live hardware boundary must be clear.
+---
 
-Current Step 6 uses a generated PUF-derived key registry. Do not write as if the ESP32 already reconstructs the key from live SRAM during runtime unless that implementation is finished.
+# Figure And Table Placement
 
-2. Inter-HD result is not ideal.
+## Figure 1
 
-The mean Inter-HD is 0.2703, not 0.5. This should be explained as dataset bias and motivation for preprocessing, not hidden.
+Place in Section II after the first architecture paragraph.
 
-3. Helper-data security needs careful wording.
+Caption:
 
-Do not claim helper data leaks nothing. Say it is public in the fuzzy-extractor model, but security depends on entropy, bias, and construction details.
+Figure 1. Reliability-aware SRAM PUF enrollment and MQTT authentication pipeline.
 
-4. Authentication is not encryption.
+Recommended blocks:
 
-HMAC provides authentication and integrity. Confidentiality requires TLS or payload encryption.
+- SRAM startup dataset
+- Stability analysis
+- Stable-bit mask
+- Fuzzy extractor Gen/Rep
+- PUF-derived key registry/helper data
+- MQTT device
+- MQTT broker
+- Authentication server
 
-5. Evaluation still lacks latency.
+## Figure 2
 
-If time allows, add a small authentication latency test. Even a Python prototype timing table is useful, as long as it is labeled as prototype-level measurement.
+Place in Section III near the MQTT implementation paragraph.
 
-6. Related work should be short but real.
+Caption:
 
-For a 4-page paper, do not add a long standalone Related Work section. Instead, cite PUF, SRAM PUF, fuzzy extractor, MQTT, and HMAC directly in the Introduction and Implementation sections.
+Figure 2. MQTT-based HMAC challenge-response sequence.
 
-## Reference Recommendations
+Recommended actors:
 
-Use 6 to 8 references. These are appropriate for a short conference paper:
+- Authentication Server
+- MQTT Broker
+- IoT Device
+
+Recommended messages:
+
+1. Server publishes `{UID, nonce, timestamp}`.
+2. Broker delivers challenge.
+3. Device obtains/reconstructs PUF-derived key.
+4. Device publishes `{UID, nonce, timestamp, hmac}`.
+5. Broker delivers response.
+6. Server checks pending challenge, time window, nonce cache, and HMAC.
+
+# Reviewer-Safe Notes
+
+Use these points if the teacher or reviewer asks hard questions.
+
+- This is device authentication, not user authentication.
+- HMAC gives authentication and integrity, not encryption.
+- The current Step 6 integration uses a generated PUF-derived key registry.
+- Live SRAM response acquisition is future work.
+- Inter-HD is lower than ideal; this is reported as dataset bias.
+- Helper data is public in the fuzzy-extractor model, but leakage still needs analysis.
+- Threshold comparison artifacts currently have identical aggregate rows, so the paper should not overclaim a threshold sweep.
+
+# References To Use
 
 [1] OASIS Standard, "MQTT Version 3.1.1," Oct. 2014.
 
@@ -259,12 +262,3 @@ Use 6 to 8 references. These are appropriate for a short conference paper:
 [7] J. Delvaux, R. Peeters, D. Gu, and I. Verbauwhede, "A survey on lightweight entity authentication with strong PUFs," ACM Computing Surveys, vol. 48, no. 2, 2015.
 
 [8] R. Maes and I. Verbauwhede, "Physically unclonable functions: A study on the state of the art and future research directions," in Towards Hardware-Intrinsic Security, Springer, 2010.
-
-## Next Concrete Tasks
-
-1. Insert Figure 1 after the first paragraph of Section II.
-2. Insert Figure 2 after Section II-B or inside Section III.
-3. Convert Table 1 and Table 2 into Word tables in Section V.
-4. Add citations in Word using the reference numbers above.
-5. If possible, run a small authentication latency experiment and add one sentence or a small table.
-6. Ask the teacher whether the advisor should be listed as a co-author or acknowledged only.
