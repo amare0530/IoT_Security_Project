@@ -2,3 +2,5 @@ numpy>=1.26
 pandas>=2.2
 paho-mqtt>=2.1
 pytest>=8.2
+matplotlib>=3.8
+seaborn>=0.13

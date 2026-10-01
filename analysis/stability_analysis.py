@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List
@@ -47,6 +48,7 @@ def parse_args() -> argparse.Namespace:
         help="Per-UID holdout ratio for BER estimation",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--run-label", default=None, help="Human-readable identifier stored in the run manifest")
     return parser.parse_args()
 
 
@@ -266,6 +268,24 @@ def threshold_comparison(
     return pd.DataFrame(rows)
 
 
+def write_run_manifest(args: argparse.Namespace, outputs: Iterable[Path], device_count: int) -> None:
+    """Persist lightweight provenance beside a new analysis run."""
+    manifest = {
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "run_label": args.run_label,
+        "input": str(args.input),
+        "input_bytes": args.input.stat().st_size,
+        "thresholds": args.thresholds,
+        "holdout_ratio": args.holdout_ratio,
+        "seed": args.seed,
+        "device_count": device_count,
+        "outputs": [{"path": str(path), "bytes": path.stat().st_size} for path in outputs if path.exists()],
+        "warning": "Masks are built from all captures in this legacy analysis path; use a holdout-aware run before making comparative threshold claims.",
+    }
+    with (args.output_dir / "run_manifest.json").open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+
+
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -301,6 +321,16 @@ def main() -> None:
         seed=args.seed,
     )
     comparison.to_csv(args.output_dir / "threshold_comparison.csv", index=False)
+    write_run_manifest(
+        args,
+        [
+            stability_csv,
+            args.output_dir / "device_summary.csv",
+            args.output_dir / "masks.json",
+            args.output_dir / "threshold_comparison.csv",
+        ],
+        len(device_summary),
+    )
 
     print("\n=== 裝置摘要 ===")
     print(device_summary.to_string(index=False))

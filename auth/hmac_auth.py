@@ -47,7 +47,10 @@ class PUFAuthenticator:
         current_time = int(time.time())
         self._prune_used_nonces(current_time)
 
-        if abs(current_time - challenge_time) > self.time_window:
+        if challenge_time > current_time:
+            return False, "Authentication Failed: Challenge timestamp is in the future."
+
+        if current_time - challenge_time > self.time_window:
             return False, "Authentication Failed: Challenge expired (Possible Replay Attack)."
 
         if nonce in self.used_nonces:

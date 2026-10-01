@@ -73,7 +73,14 @@ def run_server(config: ServerConfig) -> None:
 
     def on_message(client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
         nonlocal authenticated
-        payload = json.loads(message.payload.decode("utf-8"))
+        try:
+            payload = json.loads(message.payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            print("Server ignored malformed MQTT payload")
+            return
+        if not isinstance(payload, dict):
+            print("Server ignored non-object MQTT payload")
+            return
         uid = payload.get("uid", "")
 
         if uid != config.uid:
@@ -83,7 +90,7 @@ def run_server(config: ServerConfig) -> None:
         try:
             challenge = extract_challenge(payload)
             expected_challenge = pending_challenges[uid]
-        except KeyError:
+        except (KeyError, TypeError):
             print(f"Authentication valid=False for uid={uid}: missing challenge")
             return
 

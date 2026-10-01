@@ -74,5 +74,18 @@ def test_puf_authentication_flow() -> None:
     print(replay_msg)
 
 
+def test_future_timestamp_is_rejected() -> None:
+    key = bytes.fromhex("00112233445566778899aabbccddeeff")
+    auth = PUFAuthenticator(time_window_seconds=60)
+    challenge = auth.generate_challenge()
+    challenge["timestamp"] = str(int(time.time()) + 30)
+    response = auth.generate_response(key, "device-001", challenge)
+
+    valid, message = auth.verify_response(key, "device-001", challenge, response)
+
+    assert valid is False
+    assert "future" in message
+
+
 if __name__ == "__main__":
     test_puf_authentication_flow()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import secrets
@@ -109,16 +110,45 @@ class FuzzyExtractor:
         Returns:
             key : 重建出的 128-bit bytes
         """
-        indices = np.array(helper_data["stable_indices"])
-        repetition = helper_data["repetition"]
-        bits_needed = helper_data["bits_needed"]
-        W = np.array(helper_data["W"], dtype=np.uint8)
-        uid = helper_data.get("uid", "")
+        self._validate_helper_data(response_bits, helper_data)
+        indices = np.array(helper_data["stable_indices"], dtype=np.int64)
 
         # 1. 取出本次 PUF 位元 R'（可能帶雜訊）
         R_prime = response_bits[indices]
 
         return self._rep_from_selected_bits(R_prime, helper_data)
+
+    def _validate_helper_data(
+        self, response_bits: np.ndarray, helper_data: dict
+    ) -> None:
+        if not isinstance(helper_data, dict):
+            raise ValueError("helper_data must be an object")
+
+        required = {"stable_indices", "bits_needed", "repetition", "W"}
+        missing = required.difference(helper_data)
+        if missing:
+            raise ValueError(f"helper_data missing fields: {sorted(missing)}")
+
+        bits_needed = helper_data["bits_needed"]
+        repetition = helper_data["repetition"]
+        if not isinstance(bits_needed, int) or bits_needed <= 0:
+            raise ValueError("helper_data bits_needed must be a positive integer")
+        if not isinstance(repetition, int) or repetition <= 0 or repetition % 2 == 0:
+            raise ValueError("helper_data repetition must be a positive odd integer")
+
+        expected_length = bits_needed * repetition
+        try:
+            indices = np.asarray(helper_data["stable_indices"], dtype=np.int64)
+            encoded = np.asarray(helper_data["W"], dtype=np.uint8)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("helper_data contains invalid arrays") from exc
+
+        if len(indices) != expected_length or len(encoded) != expected_length:
+            raise ValueError("helper_data encoded arrays have an invalid length")
+        if len(response_bits) == 0 or np.any(indices < 0) or np.any(indices >= len(response_bits)):
+            raise ValueError("helper_data contains an out-of-range response index")
+        if np.any((encoded != 0) & (encoded != 1)):
+            raise ValueError("helper_data W must contain only bits 0 or 1")
 
     def _rep_from_selected_bits(self, selected_bits: np.ndarray, helper_data: dict) -> bytes:
         repetition = helper_data["repetition"]
@@ -182,6 +212,7 @@ def simulate_all(
     ber_test: float = 0.05,
     experiment_seed: int = 20260506,
     random_noise_trials: int = 100,
+    helper_output_path: Path | None = None,
 ) -> None:
     fe = FuzzyExtractor(bits_needed=bits_needed, repetition=repetition)
 
@@ -199,6 +230,7 @@ def simulate_all(
     stab = pd.read_csv(stability_csv_path, low_memory=False)
 
     results = []
+    helper_records = []
     max_err = repetition // 2  # 理論最大可容忍錯誤數
 
     print(f"實驗模式：使用固定 experiment_seed={experiment_seed} 產生可重現 enrollment key")
@@ -267,6 +299,7 @@ def simulate_all(
                 "stable_bits_consumed": len(helper_data["stable_indices"]),
             }
         )
+        helper_records.append(helper_data)
 
         print(
             f"  {uid[:20]}... | {key_gen.hex()[:16]}... | "
@@ -276,6 +309,10 @@ def simulate_all(
 
     df = pd.DataFrame(results)
     df.to_csv(output_path, index=False)
+    if helper_output_path is not None:
+        helper_output_path.parent.mkdir(parents=True, exist_ok=True)
+        with helper_output_path.open("w", encoding="utf-8") as handle:
+            json.dump(helper_records, handle, indent=2)
 
     total = len(df)
     if total == 0:
@@ -368,15 +405,21 @@ def _random_noise_success_rate(
     return successes / trials
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run fuzzy-extractor evaluation")
+    parser.add_argument("--masks", type=Path, default=Path("artifacts/masks.json"))
+    parser.add_argument("--stability-summary", type=Path, default=Path("artifacts/stability_summary.csv"))
+    parser.add_argument("--output", type=Path, default=Path("artifacts/fuzzy_extractor_results.csv"))
+    parser.add_argument("--helper-output", type=Path)
+    parser.add_argument("--threshold", type=float, default=0.9)
+    parser.add_argument("--bits-needed", type=int, default=256)
+    parser.add_argument("--repetition", type=int, default=11)
+    parser.add_argument("--ber-test", type=float, default=0.05)
+    parser.add_argument("--seed", type=int, default=20260506)
+    parser.add_argument("--random-noise-trials", type=int, default=100)
+    args = parser.parse_args()
+    simulate_all(args.masks, args.stability_summary, args.output, args.threshold, args.bits_needed, args.repetition, args.ber_test, args.seed, args.random_noise_trials, args.helper_output)
+
+
 if __name__ == "__main__":
-    simulate_all(
-        masks_path=Path("artifacts/masks.json"),
-        stability_csv_path=Path("artifacts/stability_summary.csv"),
-        output_path=Path("artifacts/fuzzy_extractor_results.csv"),
-        threshold=0.9,
-        bits_needed=256,
-        repetition=11,
-        ber_test=0.05,
-        experiment_seed=20260506,
-        random_noise_trials=100,
-    )
+    main()
