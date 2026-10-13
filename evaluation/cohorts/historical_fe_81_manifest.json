@@ -1,0 +1,17 @@
+{
+  "name": "historical_fe_81",
+  "purpose": "Historical downstream cohort for fuzzy-extractor and Inter-HD evaluation.",
+  "source": "historical project provenance",
+  "original_device_count": 84,
+  "excluded_device_count": 3,
+  "included_device_count": 81,
+  "exclusion_type": "incomplete_source_csv",
+  "excluded_uids": [
+    "3038470230373036001E0027",
+    "3538470937303130003E0026",
+    "3538471437303130002E0034"
+  ],
+  "exclusion_reason": "Incomplete source CSV data. This was a historical source-data exclusion, not threshold filtering, stability failure, fuzzy-extractor failure, or a security exclusion.",
+  "limitations": "The repository does not preserve the original completeness checker or the specific missing rows, addresses, or captures.",
+  "policy": "Future runs must record machine-verifiable eligibility criteria instead of inheriting this historical list."
+}

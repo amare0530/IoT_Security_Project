@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="980" viewBox="0 0 1700 980">
+<defs>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#374151"/></marker>
+  <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.16"/></filter>
+</defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+
+<text x="850.0" y="48" font-size="34" font-weight="700" fill="#111827" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="850.0" dy="0">Reliability-Aware SRAM PUF Authentication System</tspan>
+</text>
+<text x="850.0" y="83" font-size="18" font-weight="400" fill="#475569" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="850.0" dy="0">Offline enrollment establishes trust; online MQTT challenge-response verifies enrolled devices.</tspan>
+</text>
+<rect x="40" y="120" width="780" height="760" rx="24" fill="#f8fbff" stroke="#2563eb" stroke-width="3"/>
+<rect x="880" y="120" width="780" height="760" rx="24" fill="#f8fff8" stroke="#16a34a" stroke-width="3"/>
+<text x="430" y="160" font-size="24" font-weight="700" fill="#1d4ed8" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="430" dy="0">Offline Enrollment Phase</tspan>
+</text>
+<text x="430" y="188" font-size="16" font-weight="400" fill="#1e40af" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="430" dy="0">Trusted administrative environment</tspan>
+</text>
+<text x="1270" y="160" font-size="24" font-weight="700" fill="#15803d" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1270" dy="0">Online Authentication Phase</tspan>
+</text>
+<text x="1270" y="188" font-size="16" font-weight="400" fill="#166534" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1270" dy="0">Runtime device authentication over MQTT</tspan>
+</text>
+<rect x="90" y="215" width="680" height="72" rx="18" fill="#eff6ff" stroke="#1d4ed8" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="430" y="246" font-size="17" font-weight="700" fill="#1e3a8a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="430" dy="0">Root of Trust: one-time trusted enrollment associates Device UID with PUF-derived key material</tspan>
+</text>
+<text x="430" y="270" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="430" dy="0">The server later verifies HMAC tags, not public UID claims alone.</tspan>
+</text>
+<rect x="95" y="330" width="230" height="130" rx="16" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<text x="210.0" y="358" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="210.0" dy="0">SRAM PUF Readouts</tspan>
+</text>
+<text x="210.0" y="388" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="210.0" dy="0">84 STM32 devices</tspan>
+<tspan x="210.0" dy="18.75">repeated startup responses</tspan>
+</text>
+<rect x="390" y="330" width="230" height="130" rx="16" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<text x="505.0" y="358" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="505.0" dy="0">Stability Analysis</tspan>
+</text>
+<text x="505.0" y="388" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="505.0" dy="0">Si = max(Pi(0), Pi(1))</tspan>
+<tspan x="505.0" dy="18.75">threshold &gt;= 0.90</tspan>
+</text>
+<rect x="95" y="535" width="230" height="130" rx="16" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<text x="210.0" y="563" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="210.0" dy="0">Stable-Bit Mask</tspan>
+</text>
+<text x="210.0" y="593" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="210.0" dy="0">discard unstable cells</tspan>
+<tspan x="210.0" dy="18.75">device-specific mask</tspan>
+</text>
+<rect x="390" y="535" width="230" height="130" rx="16" fill="#ffffff" stroke="#2563eb" stroke-width="2"/>
+<text x="505.0" y="563" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="505.0" dy="0">Fuzzy Extractor Gen()</tspan>
+</text>
+<text x="505.0" y="593" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="505.0" dy="0">repetition-code offset</tspan>
+<tspan x="505.0" dy="18.75">key + public helper data</tspan>
+</text>
+<rect x="265" y="720" width="285" height="115" rx="16" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
+<text x="407.5" y="748" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="407.5" dy="0">Enrollment Registry</tspan>
+</text>
+<text x="407.5" y="778" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="407.5" dy="0">UID, mask, helper data</tspan>
+<tspan x="407.5" dy="18.75">PUF-derived key record</tspan>
+</text>
+<line x1="325" y1="395" x2="390" y2="395" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<line x1="505" y1="460" x2="505" y2="535" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<line x1="210" y1="460" x2="210" y2="535" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<line x1="325" y1="600" x2="390" y2="600" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<line x1="505" y1="665" x2="415" y2="720" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<line x1="210" y1="665" x2="340" y2="720" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+<rect x="940" y="310" width="250" height="125" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+<text x="1065.0" y="338" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1065.0" dy="0">Authentication Server</tspan>
+</text>
+<text x="1065.0" y="368" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1065.0" dy="0">issues challenge</tspan>
+<tspan x="1065.0" dy="18.75">verifies response</tspan>
+</text>
+<rect x="1235" y="310" width="250" height="125" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+<text x="1360.0" y="338" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1360.0" dy="0">MQTT Broker</tspan>
+</text>
+<text x="1360.0" y="368" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1360.0" dy="0">message relay channel</tspan>
+<tspan x="1360.0" dy="18.75">challenge / response topics</tspan>
+</text>
+<rect x="1235" y="535" width="250" height="125" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+<text x="1360.0" y="563" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1360.0" dy="0">IoT Device Fleet</tspan>
+</text>
+<text x="1360.0" y="593" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1360.0" dy="0">enrolled devices</tspan>
+<tspan x="1360.0" dy="18.75">UID-selected challenge</tspan>
+</text>
+<rect x="940" y="535" width="250" height="125" rx="16" fill="#ffffff" stroke="#16a34a" stroke-width="2"/>
+<text x="1065.0" y="563" font-size="20" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1065.0" dy="0">Fuzzy Extractor Rep()</tspan>
+</text>
+<text x="1065.0" y="593" font-size="15" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1065.0" dy="0">reconstruct PUF-derived key</tspan>
+<tspan x="1065.0" dy="18.75">using mask + helper data</tspan>
+</text>
+<rect x="1040" y="725" width="345" height="115" rx="16" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1212.5" y="753" font-size="19" font-weight="700" fill="#0f172a" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1212.5" dy="0">HMAC-SHA256</tspan>
+</text>
+<text x="1212.5" y="783" font-size="14" font-weight="400" fill="#334155" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1212.5" dy="0">Tag = HMAC(K, UID || nonce || timestamp)</tspan>
+<tspan x="1212.5" dy="17.5">64-hex response tag</tspan>
+</text>
+<line x1="1190" y1="372" x2="1235" y2="372" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1360" y1="435" x2="1360" y2="535" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1235" y1="598" x2="1190" y2="598" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1065" y1="660" x2="1160" y2="725" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1215" y1="725" x2="1360" y2="660" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="1385" y1="725" x2="1385" y2="435" stroke="#16a34a" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#arrow)"/>
+<text x="1460" y="510" font-size="14" font-weight="400" fill="#166534" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="1460" dy="0">response via MQTT</tspan>
+</text>
+<line x1="1040" y1="780" x2="990" y2="435" stroke="#16a34a" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#arrow)"/>
+<text x="965" y="700" font-size="14" font-weight="400" fill="#166534" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="965" dy="0">constant-time HMAC check</tspan>
+</text>
+<line x1="550" y1="778" x2="940" y2="372" stroke="#7c3aed" stroke-width="4" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+<text x="745" y="545" font-size="15" font-weight="700" fill="#6d28d9" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="745" dy="0">Enrollment artifacts</tspan>
+<tspan x="745" dy="18.75">provisioned to server/device context</tspan>
+</text>
+<rect x="55" y="900" width="1590" height="52" rx="12" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+<text x="850.0" y="932" font-size="17" font-weight="700" fill="#9a3412" text-anchor="middle" font-family="Arial, Helvetica, sans-serif">
+<tspan x="850.0" dy="0">Prototype boundary: current implementation validates MQTT authentication using generated PUF-derived key registry; live SRAM runtime acquisition remains future work.</tspan>
+</text>
+</svg>

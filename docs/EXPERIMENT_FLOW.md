@@ -55,3 +55,16 @@
 2. BER vs threshold
 3. Reconstruction success vs threshold
 4. Authentication latency CDF
+
+## Reproducibility contract
+
+Each desktop run writes to a new `runs/<run-id>/` directory and records its
+input path/size, threshold list, random seed, output sizes, and cohort. For the
+historical 81-device result, use
+`evaluation/cohorts/historical_fe_81.txt`; it is the cohort behind 6,480 ordered
+pair comparisons. The original cause for the three exclusions was not recorded,
+so it must not be retroactively invented.
+
+The current threshold artifact has identical aggregate BER values at all four
+thresholds. Report that observation, not a threshold advantage, until a
+train-mask/holdout-evaluation run demonstrates one.

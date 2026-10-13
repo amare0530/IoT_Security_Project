@@ -45,6 +45,23 @@ Outputs:
 ## Next Step
 Use `artifacts/masks.json` as the core input for fuzzy extractor and authentication experiments.
 
+## Reproducible collaboration workflow
+
+- Keep `data/*.csv` and full `artifacts/*.csv` / `*.json` on the desktop. They
+  are intentionally ignored and must never be committed.
+- Run the public, deterministic demo on any laptop without the private dataset:
+
+  ```powershell
+  python scripts/run_offline_demo.py --output-dir demo-output
+  pytest -q
+  ```
+
+- Run a desktop analysis only into a new directory, for example
+  `runs/2026-09-22-full`; never overwrite historical `artifacts/` evidence.
+- See `docs/DATA_SETUP.md` for data boundaries and `docs/DEMO_GUIDE.md` for the
+  exhibition workflow. This repository is a dataset-based system-level prototype,
+  not a completed live microcontroller SRAM implementation.
+
 ## Paper-Ready Docs
 - Architecture: `docs/ARCHITECTURE_PAPER_STYLE.md`
 - Experiment flow: `docs/EXPERIMENT_FLOW.md`

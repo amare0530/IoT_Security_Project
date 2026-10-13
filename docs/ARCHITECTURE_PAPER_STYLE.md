@@ -61,3 +61,12 @@ Reliability-Aware Bit Selection for Lightweight SRAM-PUF Authentication in IoT D
 - Bind authentication payload to both challenge and nonce.
 - Use replay protection (nonce expiration + single-use challenge IDs).
 - Keep helper-data leakage model explicit in report.
+
+## Prototype boundary
+
+The implemented MQTT path loads a generated PUF-derived test key registry for
+system integration. It validates challenge, nonce/timestamp replay protection,
+HMAC verification, and MQTT payload exchange. It does **not** yet acquire a
+live SRAM response or execute `Rep()` on a microcontroller. A production design
+must replace registry lookup with device-side reconstruction and protect the
+server enrollment record.

@@ -1,70 +1,91 @@
-import matplotlib.pyplot as plt
-import seaborn as sns
+"""Reproducible inter-device Hamming-distance evaluation."""
+
+from __future__ import annotations
+
+import argparse
+import json
 from itertools import permutations
 from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import json
 
-def compute_and_plot_inter_hd(masks_path, stability_csv, threshold=0.9):
-    # 1. 讀取數據
-    with open(masks_path) as f:
-        masks = json.load(f)
-    
+
+def load_cohort(path: Path | None) -> list[str] | None:
+    if path is None:
+        return None
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def compute_and_plot_inter_hd(masks_path: Path, stability_csv: Path, threshold: float = 0.9, cohort: list[str] | None = None, output_dir: Path | None = None) -> pd.DataFrame:
+    """Calculate ordered-pair Inter-HD and optionally persist all evidence."""
+    with masks_path.open(encoding="utf-8") as handle:
+        masks_raw = json.load(handle)
     selected_bits = {
-        m["uid"]: np.array(list(m["mask"]), dtype=np.uint8)
-        for m in masks if m["threshold"] == threshold
+        str(item["uid"]): np.array(list(item["mask"]), dtype=np.uint8)
+        for item in masks_raw
+        if np.isclose(float(item["threshold"]), threshold)
     }
+    if cohort is not None:
+        requested = set(cohort)
+        selected_bits = {uid: mask for uid, mask in selected_bits.items() if uid in requested}
 
-    print("讀取 stability_summary.csv...")
-    stab = pd.read_csv(stability_csv, low_memory=False)
-    
-    dominant = {}
-    for uid, group in stab.groupby("uid"):
-        arr = group.sort_values("bit_position")["dominant_bit"].to_numpy(dtype=np.uint8)
-        dominant[uid] = arr
+    dominant: dict[str, np.ndarray] = {}
+    for uid, group in pd.read_csv(stability_csv, usecols=["uid", "bit_position", "dominant_bit"], low_memory=False).groupby("uid"):
+        uid = str(uid)
+        if uid in selected_bits:
+            dominant[uid] = group.sort_values("bit_position")["dominant_bit"].to_numpy(dtype=np.uint8)
 
-    # 2. 計算 0/1 比例 (Hamming Weight)
-    all_bits = np.concatenate(list(dominant.values()))
-    hw = np.mean(all_bits)
-    print(f"物理偏誤分析: 0 佔 {1-hw:.4f}, 1 佔 {hw:.4f}")
+    eligible = sorted(set(selected_bits) & set(dominant))
+    rows: list[dict[str, object]] = []
+    for target_a, attacker_b in permutations(eligible, 2):
+        mask = selected_bits[target_a].astype(bool)
+        if len(mask) != len(dominant[target_a]) or len(mask) != len(dominant[attacker_b]):
+            raise ValueError(f"incompatible response length for {target_a} and {attacker_b}")
+        rows.append({"target_a": target_a, "attacker_b": attacker_b, "inter_hd": float(np.mean(dominant[target_a][mask] != dominant[attacker_b][mask])), "mask_size": int(mask.sum())})
 
-    # 3. 計算 Inter-HD (Permutations)
-    uids = list(selected_bits.keys())
-    hd_values = []
-    
-    for uid_a, uid_b in permutations(uids, 2):
-        if uid_a not in dominant or uid_b not in dominant: continue
-        
-        mask_a = selected_bits[uid_a].astype(bool)
-        dom_a = dominant[uid_a][mask_a]
-        dom_b = dominant[uid_b][mask_a]
-        
-        hd = np.mean(dom_a != dom_b)
-        hd_values.append(hd)
+    result = pd.DataFrame(rows, columns=["target_a", "attacker_b", "inter_hd", "mask_size"])
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        result.to_csv(output_dir / "inter_hd.csv", index=False)
+        summary = {
+            "threshold": threshold,
+            "requested_cohort_size": len(cohort) if cohort is not None else None,
+            "eligible_devices": eligible,
+            "device_count": len(eligible),
+            "ordered_pair_count": len(result),
+            "mean_inter_hd": float(result["inter_hd"].mean()) if not result.empty else None,
+            "std_inter_hd": float(result["inter_hd"].std(ddof=0)) if not result.empty else None,
+        }
+        (output_dir / "inter_hd_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        if not result.empty:
+            plt.figure(figsize=(10, 6))
+            plt.hist(result["inter_hd"], bins=30, color="skyblue", edgecolor="white")
+            plt.axvline(0.5, color="red", linestyle="--", label="Ideal (0.5)")
+            plt.axvline(summary["mean_inter_hd"], color="green", label="Observed mean")
+            plt.xlabel("Normalized Hamming distance")
+            plt.ylabel("Ordered pair count")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(output_dir / "inter_hd_dist.png", dpi=160)
+            plt.close()
+    return result
 
-    # 4. 繪製 Inter-HD 分佈圖
-    plt.figure(figsize=(10, 6))
-    sns.histplot(hd_values, kde=True, color='skyblue', bins=30)
-    plt.axvline(x=0.5, color='red', linestyle='--', label='Ideal (0.5)')
-    plt.axvline(x=np.mean(hd_values), color='green', linestyle='-', label=f'Mean ({np.mean(hd_values):.4f})')
-    
-    plt.title("Inter-device Hamming Distance Distribution")
-    plt.xlabel("Hamming Distance")
-    plt.ylabel("Frequency")
-    plt.legend()
-    plt.grid(axis='y', alpha=0.3)
-    
-    # 確保資料夾存在並存檔
-    Path("artifacts").mkdir(exist_ok=True)
-    plt.savefig("artifacts/inter_hd_dist.png")
-    print(f"分佈圖已儲存至 artifacts/inter_hd_dist.png")
-    
-    return pd.DataFrame({"inter_hd": hd_values})
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Create reproducible Inter-HD artifacts")
+    parser.add_argument("--masks", type=Path, required=True)
+    parser.add_argument("--stability-summary", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--threshold", type=float, default=0.90)
+    parser.add_argument("--cohort-file", type=Path)
+    args = parser.parse_args()
+    result = compute_and_plot_inter_hd(args.masks, args.stability_summary, args.threshold, load_cohort(args.cohort_file), args.output_dir)
+    print(f"ordered pairs: {len(result)}")
+
 
 if __name__ == "__main__":
-    df = compute_and_plot_inter_hd(
-        Path("artifacts/masks.json"), 
-        Path("artifacts/stability_summary.csv")
-    )
-    print(f"平均 Inter-HD: {df['inter_hd'].mean():.4f}")
+    main()
