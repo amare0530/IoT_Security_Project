@@ -88,17 +88,24 @@ def _write_bundle(
         writer.writerow({"uid": uid, "key_hex": key.hex()})
 
     with (device_dir / "helper_data.json").open("w", encoding="utf-8") as handle:
-        json.dump(helper_data, handle, indent=2)
+        json.dump({uid: helper_data}, handle, indent=2)
         handle.write("\n")
 
-    np.save(device_dir / "sram_boot.npy", first_holdout)
+    response_data = {uid: {"response_bits": first_holdout.tolist()}}
+    with (device_dir / "response.json").open("w", encoding="utf-8") as handle:
+        json.dump(response_data, handle)
+        handle.write("\n")
 
-    readme = """Demo bundle
+    readme = f"""Demo bundle
 ===========
 
 Copy server/key_registry.csv to the server. Copy the two files under
-device/ to the device. The device directory contains public helper data and
-one SRAM boot response only; it must not contain the registered key.
+device/ to the device. Start the device with:
+
+python -m mqtt.device --uid {uid} --response-registry demo_bundle/device/response.json --helper-registry demo_bundle/device/helper_data.json
+
+The device directory contains public helper data and one SRAM boot response
+only; it must not contain the registered key.
 """
     (out_dir / "README.txt").write_text(readme, encoding="utf-8")
 
