@@ -69,6 +69,18 @@ have been overwritten; a true memory-clearing guarantee requires an MCU
 implementation in C. The unauthenticated `iot/auth/result` topic is
 informational only and never controls device behavior.
 
+The demo attack helpers are run without key material:
+
+```powershell
+python scripts/demo_attack.py forge --uid device-001
+python scripts/demo_attack.py replay --uid device-001
+python scripts/demo_attack.py tamper --uid device-001
+python scripts/demo_attack.py expired --uid device-001
+```
+
+The `expired` helper can demonstrate an expired or missing-pending-challenge
+path, but cannot produce a valid tag without the device key.
+
 ## Paper-Ready Docs
 - Architecture: `docs/ARCHITECTURE_PAPER_STYLE.md`
 - Experiment flow: `docs/EXPERIMENT_FLOW.md`

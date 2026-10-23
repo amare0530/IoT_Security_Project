@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import sys
 import time
@@ -47,6 +48,47 @@ def extract_challenge(payload: dict[str, str]) -> dict[str, str]:
     }
 
 
+def classify_response(
+    payload: object,
+    expected_uid: str,
+    pending_challenges: dict[str, dict[str, str]],
+    authenticator: PUFAuthenticator,
+    expected_key: bytes,
+    now: int | None = None,
+) -> tuple[str | None, str, dict[str, str] | None]:
+    if not isinstance(payload, dict):
+        return "invalid challenge payload", "", None
+    uid = payload.get("uid", "")
+    if uid != expected_uid:
+        return "uid mismatch", "", None
+    try:
+        challenge = extract_challenge(payload)
+    except (KeyError, TypeError):
+        return "invalid challenge payload", "", None
+    nonce = challenge.get("nonce", "")
+    current_time = int(time.time()) if now is None else now
+    authenticator._prune_used_nonces(current_time)
+    if nonce in authenticator.used_nonces:
+        return "replay: nonce already used", nonce, challenge
+    expected = pending_challenges.get(uid)
+    if expected is None:
+        return "missing pending challenge", nonce, challenge
+    if challenge != expected:
+        return "challenge mismatch", nonce, challenge
+    try:
+        challenge_time = int(challenge["timestamp"])
+    except (KeyError, TypeError, ValueError):
+        return "invalid timestamp", nonce, challenge
+    if challenge_time > current_time:
+        return "timestamp future", nonce, challenge
+    if current_time - challenge_time > authenticator.time_window:
+        return "timestamp expired", nonce, challenge
+    expected_tag = authenticator.generate_response(expected_key, uid, challenge)
+    if not hmac.compare_digest(expected_tag, str(payload.get("hmac", ""))):
+        return "tag mismatch", nonce, challenge
+    return None, nonce, challenge
+
+
 def run_server(config: ServerConfig) -> None:
     secret_key = resolve_key_bytes(
         uid=config.uid,
@@ -68,10 +110,12 @@ def run_server(config: ServerConfig) -> None:
             f"nonce={payload['nonce'][:8]}..."
         )
 
-    def publish_result(uid: str, accepted: bool) -> None:
+    def publish_result(uid: str, nonce: str, accepted: bool) -> None:
         client.publish(
             config.result_topic,
-            json.dumps({"uid": uid, "status": "ACCEPT" if accepted else "REJECT"}),
+            json.dumps(
+                {"uid": uid, "nonce": nonce, "status": "ACCEPT" if accepted else "REJECT"}
+            ),
             qos=1,
         )
 
@@ -91,45 +135,15 @@ def run_server(config: ServerConfig) -> None:
             return
         uid = payload.get("uid", "")
 
-        if uid != config.uid:
-            print(f"REJECT uid mismatch: uid={uid}")
-            publish_result(str(uid), False)
+        reason, nonce, challenge = classify_response(
+            payload, config.uid, pending_challenges, authenticator, secret_key
+        )
+        if reason is not None:
+            print(f"REJECT {reason}: uid={uid}")
+            if uid == config.uid:
+                publish_result(uid, nonce, False)
             return
-
-        try:
-            challenge = extract_challenge(payload)
-        except (KeyError, TypeError):
-            print(f"REJECT invalid challenge payload: uid={uid}")
-            publish_result(uid, False)
-            return
-
-        nonce = challenge.get("nonce")
-        if nonce in authenticator.used_nonces:
-            print(f"REJECT replay: nonce already used: uid={uid}")
-            publish_result(uid, False)
-            return
-
-        expected_challenge = pending_challenges.get(uid)
-        if expected_challenge is None:
-            print(f"REJECT missing pending challenge: uid={uid}")
-            publish_result(uid, False)
-            return
-        if challenge != expected_challenge:
-            print(f"REJECT challenge mismatch: uid={uid}")
-            publish_result(uid, False)
-            return
-
-        try:
-            challenge_time = int(challenge["timestamp"])
-        except (KeyError, TypeError, ValueError):
-            print(f"REJECT invalid timestamp: uid={uid}")
-            publish_result(uid, False)
-            return
-        current_time = int(time.time())
-        if challenge_time > current_time:
-            print(f"REJECT timestamp future: uid={uid}")
-        elif current_time - challenge_time > authenticator.time_window:
-            print(f"REJECT timestamp expired: uid={uid}")
+        assert challenge is not None
 
         is_valid, msg = authenticator.verify_response(
             expected_key=secret_key,
@@ -142,9 +156,7 @@ def run_server(config: ServerConfig) -> None:
         if is_valid:
             authenticated = True
             del pending_challenges[uid]
-        elif "HMAC" in msg or "signature" in msg:
-            print(f"REJECT tag mismatch: uid={uid}")
-        publish_result(uid, is_valid)
+        publish_result(uid, challenge["nonce"], is_valid)
 
     client.on_connect = on_connect
     client.on_message = on_message

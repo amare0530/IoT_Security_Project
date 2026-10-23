@@ -61,6 +61,7 @@ def run_device(config: DeviceConfig) -> None:
     if use_insecure_key:
         print("WARNING: using insecure static key material; prefer Rep() registries")
     authenticator = PUFAuthenticator()
+    last_challenge_nonce: str | None = None
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"puf-device-{config.uid}")
 
@@ -70,6 +71,7 @@ def run_device(config: DeviceConfig) -> None:
         print(f"Device {config.uid} connected and subscribed to {config.challenge_topic}")
 
     def on_message(client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
+        nonlocal last_challenge_nonce
         if message.topic == config.result_topic:
             on_result(client, userdata, message)
             return
@@ -89,6 +91,7 @@ def run_device(config: DeviceConfig) -> None:
         except KeyError:
             print("Device ignored incomplete MQTT challenge")
             return
+        last_challenge_nonce = challenge["nonce"]
         key_buffer: bytearray | None = None
         try:
             if use_insecure_key:
@@ -127,7 +130,11 @@ def run_device(config: DeviceConfig) -> None:
         except (UnicodeDecodeError, json.JSONDecodeError):
             print("Device ignored malformed authentication result")
             return
-        if isinstance(payload, dict) and payload.get("uid") == config.uid:
+        if (
+            isinstance(payload, dict)
+            and payload.get("uid") == config.uid
+            and payload.get("nonce") == last_challenge_nonce
+        ):
             # This unauthenticated topic is informational only; never stop or retry.
             print(f"Device authentication result: {payload.get('status', 'UNKNOWN')}")
 
@@ -144,8 +151,16 @@ def parse_args() -> DeviceConfig:
     parser.add_argument("--uid", default="device-001")
     parser.add_argument("--insecure-key", default=None)
     parser.add_argument("--insecure-key-registry", type=Path)
-    parser.add_argument("--response-registry", type=Path)
-    parser.add_argument("--helper-registry", type=Path)
+    parser.add_argument(
+        "--response-registry",
+        type=Path,
+        default=Path("demo_bundle/device/response.json"),
+    )
+    parser.add_argument(
+        "--helper-registry",
+        type=Path,
+        default=Path("demo_bundle/device/helper_data.json"),
+    )
     parser.add_argument("--result-topic", default="iot/auth/result")
     parser.add_argument("--challenge-topic", default="iot/auth/challenge")
     parser.add_argument("--response-topic", default="iot/auth/response")
