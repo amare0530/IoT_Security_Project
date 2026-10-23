@@ -22,6 +22,7 @@ class ServerConfig:
     uid: str = "device-001"
     challenge_topic: str = "iot/auth/challenge"
     response_topic: str = "iot/auth/response"
+    result_topic: str = "iot/auth/result"
     secret_key_hex: str | None = None
     key_registry: Path = DEFAULT_KEY_REGISTRY
     time_window_seconds: int = 60
@@ -67,6 +68,13 @@ def run_server(config: ServerConfig) -> None:
             f"nonce={payload['nonce'][:8]}..."
         )
 
+    def publish_result(uid: str, accepted: bool) -> None:
+        client.publish(
+            config.result_topic,
+            json.dumps({"uid": uid, "status": "ACCEPT" if accepted else "REJECT"}),
+            qos=1,
+        )
+
     def on_connect(client: mqtt.Client, userdata, flags, reason_code, properties):
         client.subscribe(config.response_topic, qos=1)
         print(f"Server connected and subscribed to {config.response_topic}")
@@ -84,19 +92,44 @@ def run_server(config: ServerConfig) -> None:
         uid = payload.get("uid", "")
 
         if uid != config.uid:
-            print(f"Authentication valid=False for uid={uid}: unknown uid")
+            print(f"REJECT uid mismatch: uid={uid}")
+            publish_result(str(uid), False)
             return
 
         try:
             challenge = extract_challenge(payload)
-            expected_challenge = pending_challenges[uid]
         except (KeyError, TypeError):
-            print(f"Authentication valid=False for uid={uid}: missing challenge")
+            print(f"REJECT invalid challenge payload: uid={uid}")
+            publish_result(uid, False)
             return
 
-        if challenge != expected_challenge:
-            print(f"Authentication valid=False for uid={uid}: challenge mismatch")
+        nonce = challenge.get("nonce")
+        if nonce in authenticator.used_nonces:
+            print(f"REJECT replay: nonce already used: uid={uid}")
+            publish_result(uid, False)
             return
+
+        expected_challenge = pending_challenges.get(uid)
+        if expected_challenge is None:
+            print(f"REJECT missing pending challenge: uid={uid}")
+            publish_result(uid, False)
+            return
+        if challenge != expected_challenge:
+            print(f"REJECT challenge mismatch: uid={uid}")
+            publish_result(uid, False)
+            return
+
+        try:
+            challenge_time = int(challenge["timestamp"])
+        except (KeyError, TypeError, ValueError):
+            print(f"REJECT invalid timestamp: uid={uid}")
+            publish_result(uid, False)
+            return
+        current_time = int(time.time())
+        if challenge_time > current_time:
+            print(f"REJECT timestamp future: uid={uid}")
+        elif current_time - challenge_time > authenticator.time_window:
+            print(f"REJECT timestamp expired: uid={uid}")
 
         is_valid, msg = authenticator.verify_response(
             expected_key=secret_key,
@@ -109,6 +142,9 @@ def run_server(config: ServerConfig) -> None:
         if is_valid:
             authenticated = True
             del pending_challenges[uid]
+        elif "HMAC" in msg or "signature" in msg:
+            print(f"REJECT tag mismatch: uid={uid}")
+        publish_result(uid, is_valid)
 
     client.on_connect = on_connect
     client.on_message = on_message
@@ -136,6 +172,7 @@ def parse_args() -> ServerConfig:
     parser.add_argument("--key-registry", type=Path, default=DEFAULT_KEY_REGISTRY)
     parser.add_argument("--challenge-topic", default="iot/auth/challenge")
     parser.add_argument("--response-topic", default="iot/auth/response")
+    parser.add_argument("--result-topic", default="iot/auth/result")
     parser.add_argument("--time-window", type=int, default=60)
     parser.add_argument("--challenge-interval", type=int, default=5)
     args = parser.parse_args()
@@ -147,6 +184,7 @@ def parse_args() -> ServerConfig:
         key_registry=args.key_registry,
         challenge_topic=args.challenge_topic,
         response_topic=args.response_topic,
+        result_topic=args.result_topic,
         time_window_seconds=args.time_window,
         challenge_interval_seconds=args.challenge_interval,
     )

@@ -62,6 +62,13 @@ Use `artifacts/masks.json` as the core input for fuzzy extractor and authenticat
   exhibition workflow. This repository is a dataset-based system-level prototype,
   not a completed live microcontroller SRAM implementation.
 
+The MQTT device demo reconstructs its key with `Rep()` for each challenge and
+uses it immediately for HMAC. It best-effort clears its local `bytearray`
+buffer afterward. Python cannot guarantee that all immutable `bytes` copies
+have been overwritten; a true memory-clearing guarantee requires an MCU
+implementation in C. The unauthenticated `iot/auth/result` topic is
+informational only and never controls device behavior.
+
 ## Paper-Ready Docs
 - Architecture: `docs/ARCHITECTURE_PAPER_STYLE.md`
 - Experiment flow: `docs/EXPERIMENT_FLOW.md`

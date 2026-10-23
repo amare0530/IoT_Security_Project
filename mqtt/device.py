@@ -25,10 +25,11 @@ class DeviceConfig:
     uid: str = "device-001"
     challenge_topic: str = "iot/auth/challenge"
     response_topic: str = "iot/auth/response"
-    secret_key_hex: str | None = None
-    key_registry: Path = DEFAULT_KEY_REGISTRY
-    response_registry: Path | None = None
-    helper_registry: Path | None = None
+    insecure_key_hex: str | None = None
+    insecure_key_registry: Path | None = None
+    response_registry: Path | None = Path("demo_bundle/device/response.json")
+    helper_registry: Path | None = Path("demo_bundle/device/helper_data.json")
+    result_topic: str = "iot/auth/result"
 
 
 def build_response_payload(
@@ -48,25 +49,30 @@ def build_response_payload(
 def run_device(config: DeviceConfig) -> None:
     if (config.response_registry is None) != (config.helper_registry is None):
         raise ValueError("response_registry and helper_registry must be provided together")
-    if config.response_registry is not None and config.helper_registry is not None:
-        secret_key = resolve_reconstructed_key(
-            config.uid, config.response_registry, config.helper_registry
+    use_insecure_key = (
+        config.insecure_key_hex is not None or config.insecure_key_registry is not None
+    )
+    if not use_insecure_key and (
+        config.response_registry is None or config.helper_registry is None
+    ):
+        raise ValueError(
+            "response_registry and helper_registry are required unless an insecure key is supplied"
         )
-    else:
-        secret_key = resolve_key_bytes(
-            uid=config.uid,
-            manual_key_hex=config.secret_key_hex,
-            registry_path=config.key_registry,
-        )
+    if use_insecure_key:
+        print("WARNING: using insecure static key material; prefer Rep() registries")
     authenticator = PUFAuthenticator()
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"puf-device-{config.uid}")
 
     def on_connect(client: mqtt.Client, userdata, flags, reason_code, properties):
         client.subscribe(config.challenge_topic, qos=1)
+        client.subscribe(config.result_topic, qos=1)
         print(f"Device {config.uid} connected and subscribed to {config.challenge_topic}")
 
     def on_message(client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
+        if message.topic == config.result_topic:
+            on_result(client, userdata, message)
+            return
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
@@ -83,14 +89,47 @@ def run_device(config: DeviceConfig) -> None:
         except KeyError:
             print("Device ignored incomplete MQTT challenge")
             return
-        response = build_response_payload(
-            authenticator=authenticator,
-            secret_key=secret_key,
-            uid=config.uid,
-            challenge=challenge,
-        )
-        client.publish(config.response_topic, json.dumps(response), qos=1)
-        print(f"Device {config.uid} published HMAC response")
+        key_buffer: bytearray | None = None
+        try:
+            if use_insecure_key:
+                key = resolve_key_bytes(
+                    uid=config.uid,
+                    manual_key_hex=config.insecure_key_hex,
+                    registry_path=config.insecure_key_registry or DEFAULT_KEY_REGISTRY,
+                )
+            else:
+                key = resolve_reconstructed_key(
+                    config.uid, config.response_registry, config.helper_registry
+                )
+            key_buffer = bytearray(key)
+            response = build_response_payload(
+                authenticator=authenticator,
+                secret_key=bytes(key_buffer),
+                uid=config.uid,
+                challenge=challenge,
+            )
+            client.publish(config.response_topic, json.dumps(response), qos=1)
+            print(f"Device {config.uid} published HMAC response")
+        except Exception as exc:
+            print(f"Device {config.uid} could not reconstruct key; response not sent: {exc}")
+        finally:
+            if key_buffer is not None:
+                for index in range(len(key_buffer)):
+                    key_buffer[index] = 0
+                print(
+                    "Device best-effort cleared its local key buffer; "
+                    "Python cannot guarantee memory overwrites."
+                )
+
+    def on_result(client: mqtt.Client, userdata, message: mqtt.MQTTMessage):
+        try:
+            payload = json.loads(message.payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            print("Device ignored malformed authentication result")
+            return
+        if isinstance(payload, dict) and payload.get("uid") == config.uid:
+            # This unauthenticated topic is informational only; never stop or retry.
+            print(f"Device authentication result: {payload.get('status', 'UNKNOWN')}")
 
     client.on_connect = on_connect
     client.on_message = on_message
@@ -103,10 +142,11 @@ def parse_args() -> DeviceConfig:
     parser.add_argument("--broker", default="localhost")
     parser.add_argument("--port", type=int, default=1883)
     parser.add_argument("--uid", default="device-001")
-    parser.add_argument("--key", default=None)
-    parser.add_argument("--key-registry", type=Path, default=DEFAULT_KEY_REGISTRY)
+    parser.add_argument("--insecure-key", default=None)
+    parser.add_argument("--insecure-key-registry", type=Path)
     parser.add_argument("--response-registry", type=Path)
     parser.add_argument("--helper-registry", type=Path)
+    parser.add_argument("--result-topic", default="iot/auth/result")
     parser.add_argument("--challenge-topic", default="iot/auth/challenge")
     parser.add_argument("--response-topic", default="iot/auth/response")
     args = parser.parse_args()
@@ -114,10 +154,11 @@ def parse_args() -> DeviceConfig:
         broker=args.broker,
         port=args.port,
         uid=args.uid,
-        secret_key_hex=args.key,
-        key_registry=args.key_registry,
+        insecure_key_hex=args.insecure_key,
+        insecure_key_registry=args.insecure_key_registry,
         response_registry=args.response_registry,
         helper_registry=args.helper_registry,
+        result_topic=args.result_topic,
         challenge_topic=args.challenge_topic,
         response_topic=args.response_topic,
     )
