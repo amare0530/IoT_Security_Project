@@ -3,6 +3,8 @@ import threading
 import time
 from argparse import Namespace
 
+import pytest
+
 from scripts.demo_attack import (
     _publish,
     expired_payload,
@@ -17,6 +19,22 @@ class FakeClient:
 
     def publish(self, topic, payload, **kwargs):
         self.published.append((topic, json.loads(payload)))
+        return PublishInfo()
+
+
+class PublishInfo:
+    rc = 0
+
+    def wait_for_publish(self, timeout):
+        pass
+
+    def is_published(self):
+        return True
+
+
+class FailedPublishInfo(PublishInfo):
+    def is_published(self):
+        return False
 
 
 def test_attack_publish_format_contains_no_key_material():
@@ -28,6 +46,32 @@ def test_attack_publish_format_contains_no_key_material():
     assert value["uid"] == "demo"
     assert set(value) == {"uid", "nonce", "timestamp", "hmac"}
     assert "key" not in json.dumps(value).lower()
+
+
+def test_publish_waits_for_qos_one_completion(monkeypatch):
+    from scripts import demo_attack
+
+    info = PublishInfo()
+
+    class Client:
+        def publish(self, *args, **kwargs):
+            return info
+
+    calls = []
+    monkeypatch.setattr(info, "wait_for_publish", lambda timeout: calls.append(timeout))
+    demo_attack._publish(Client(), "iot/auth/response", {"nonce": "n"}, "forge")
+    assert calls == [demo_attack.PUBLISH_TIMEOUT_SECONDS]
+
+
+def test_publish_failure_is_explicit():
+    from scripts import demo_attack
+
+    class Client:
+        def publish(self, *args, **kwargs):
+            return FailedPublishInfo()
+
+    with pytest.raises(TimeoutError, match="confirmation timed out"):
+        demo_attack._publish(Client(), "iot/auth/response", {"nonce": "n"}, "forge")
 
 
 def test_attack_modes_are_explicit():
@@ -71,6 +115,7 @@ def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
 
         def publish(self, topic, payload, **kwargs):
             self.published.append((topic, json.loads(payload)))
+            return PublishInfo()
 
         def connect(self, *args, **kwargs):
             def notify():

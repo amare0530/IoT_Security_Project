@@ -9,13 +9,27 @@ import time
 
 import paho.mqtt.client as mqtt
 
+PUBLISH_TIMEOUT_SECONDS = 5.0
+
 
 def _log(action: str, topic: str, nonce: str) -> None:
     print(f"{action}: topic={topic}, nonce={nonce[:8]}...")
 
 
 def _publish(client: mqtt.Client, topic: str, payload: dict[str, str], action: str) -> None:
-    client.publish(topic, json.dumps(payload), qos=1)
+    publish_info = client.publish(topic, json.dumps(payload), qos=1)
+    if publish_info is None:
+        raise RuntimeError("MQTT publish did not return delivery status")
+    if getattr(publish_info, "rc", mqtt.MQTT_ERR_SUCCESS) != mqtt.MQTT_ERR_SUCCESS:
+        raise RuntimeError(f"MQTT publish failed with rc={publish_info.rc}")
+    try:
+        publish_info.wait_for_publish(timeout=PUBLISH_TIMEOUT_SECONDS)
+    except (RuntimeError, ValueError) as exc:
+        raise RuntimeError(f"MQTT publish confirmation failed: {exc}") from exc
+    if not publish_info.is_published():
+        raise TimeoutError(
+            f"MQTT publish confirmation timed out after {PUBLISH_TIMEOUT_SECONDS:g}s"
+        )
     _log(action, topic, payload.get("nonce", ""))
 
 
@@ -66,24 +80,35 @@ def run_attack(args: argparse.Namespace) -> None:
         if not isinstance(payload, dict) or payload.get("uid") != args.uid:
             return
         if message.topic == args.response_topic:
-            if args.mode == "replay":
-                _publish(client, args.response_topic, payload, "replay")
-                action_done.set()
-                client.disconnect()
-            elif args.mode == "tamper":
-                _publish(client, args.response_topic, tamper_payload(payload), "tamper")
-                action_done.set()
-                client.disconnect()
+            try:
+                if args.mode == "replay":
+                    _publish(client, args.response_topic, payload, "replay")
+                elif args.mode == "tamper":
+                    _publish(client, args.response_topic, tamper_payload(payload), "tamper")
+                else:
+                    return
+            except (RuntimeError, TimeoutError) as exc:
+                connection_error.append(str(exc))
+            action_done.set()
+            client.disconnect()
         elif message.topic == args.challenge_topic:
-            if args.mode == "forge":
-                _publish(client, args.response_topic, forge_payload(args.uid, payload), "forge")
-                action_done.set()
-                client.disconnect()
-            elif args.mode == "expired":
-                # No key is used or required by this attacker.
-                _publish(client, args.response_topic, expired_payload(args.uid, args.time_window), "expired")
-                action_done.set()
-                client.disconnect()
+            try:
+                if args.mode == "forge":
+                    _publish(client, args.response_topic, forge_payload(args.uid, payload), "forge")
+                elif args.mode == "expired":
+                    # No key is used or required by this attacker.
+                    _publish(
+                        client,
+                        args.response_topic,
+                        expired_payload(args.uid, args.time_window),
+                        "expired",
+                    )
+                else:
+                    return
+            except (RuntimeError, TimeoutError) as exc:
+                connection_error.append(str(exc))
+            action_done.set()
+            client.disconnect()
 
     client.on_connect = on_connect
     client.on_message = on_message
