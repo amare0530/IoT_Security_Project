@@ -1,5 +1,7 @@
 import json
 import sys
+import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -414,27 +416,135 @@ def test_server_on_message_rejection_cases(
 
 
 def test_server_callback_response_delay_reaches_timestamp_expired(monkeypatch, tmp_path):
-    monkeypatch.setattr(server_module.time, "time", lambda: 1005)
-    challenge = {"uid": "device-001", "nonce": "n", "timestamp": "1000"}
-
-    def delayed_device_response(payload, key):
-        return build_response_payload(
-            server_module.PUFAuthenticator(time_window_seconds=3),
-            key,
-            "device-001",
-            {"nonce": payload["nonce"], "timestamp": payload["timestamp"]},
-        )
-
-    published, logs, *_ = _run_server_callback_case(
-        monkeypatch, tmp_path,
-        delayed_device_response,
-        challenge=challenge,
-        config=ServerConfig(time_window_seconds=3, challenge_interval_seconds=0),
+    clock = {"now": 1000}
+    golden = np.random.default_rng(21).integers(0, 2, 655360, dtype=np.uint8)
+    mask = np.zeros(655360, dtype=np.uint8)
+    mask[:2816] = 1
+    key, helper = FuzzyExtractor().gen(
+        golden, mask, "device-001", np.random.default_rng(22)
     )
+    response_path = tmp_path / "response.json"
+    helper_path = tmp_path / "helper.json"
+    response_path.write_text(
+        json.dumps({"device-001": {"response_bits": golden.tolist()}})
+    )
+    helper_path.write_text(json.dumps({"device-001": helper}))
+    key_registry = tmp_path / "keys.csv"
+    key_registry.write_text("uid,key_hex\ndevice-001," + key.hex() + "\n")
+    logs = []
+    server_results = []
+    broker = {}
+    challenge_ready = threading.Event()
+    response_ready = threading.Event()
+
+    class ServerClient:
+        def __init__(self, *args, **kwargs):
+            self.on_connect = None
+            self.on_message = None
+            broker["server"] = self
+
+        def subscribe(self, *args, **kwargs):
+            pass
+
+        def publish(self, topic, payload, **kwargs):
+            value = json.loads(payload)
+            if topic.endswith("/result"):
+                server_results.append(value)
+                return
+            if topic.endswith("/challenge"):
+                broker["challenge"] = value
+                challenge_ready.set()
+                response_ready.wait(timeout=2)
+
+        def connect(self, *args, **kwargs):
+            self.on_connect(self, None, None, 0, None)
+
+        def loop_start(self):
+            pass
+
+        def is_connected(self):
+            if "response" in broker:
+                raise KeyboardInterrupt
+            return True
+
+        def loop_stop(self):
+            pass
+
+        def disconnect(self):
+            pass
+
+    class BrokerDeviceClient:
+        def __init__(self, *args, **kwargs):
+            self.on_connect = None
+            self.on_message = None
+
+        def subscribe(self, *args, **kwargs):
+            pass
+
+        def connect(self, *args, **kwargs):
+            self.on_connect(self, None, None, 0, None)
+
+        def loop_forever(self):
+            self.on_message(
+                self,
+                None,
+                Message("iot/auth/challenge", broker["challenge"]),
+            )
+
+        def publish(self, topic, payload, **kwargs):
+            value = json.loads(payload)
+            broker["response"] = value
+            broker["server"].on_message(
+                broker["server"],
+                None,
+                Message("iot/auth/response", value),
+            )
+            response_ready.set()
+
+    def client_factory(*args, **kwargs):
+        if kwargs.get("client_id") == "puf-server":
+            return ServerClient()
+        return BrokerDeviceClient()
+
+    def fake_sleep(seconds):
+        if seconds == 5:
+            clock["now"] += 5
+
+    monkeypatch.setattr(server_module.mqtt, "Client", client_factory)
+    monkeypatch.setattr("mqtt.device.mqtt.Client", client_factory)
+    monkeypatch.setattr(server_module.time, "time", lambda: clock["now"])
+    monkeypatch.setattr("mqtt.device.time.sleep", fake_sleep)
+    monkeypatch.setattr(
+        "builtins.print", lambda *args, **kwargs: logs.append(" ".join(map(str, args)))
+    )
+
+    server_thread = threading.Thread(
+        target=run_server,
+        args=(
+            ServerConfig(
+                key_registry=key_registry,
+                time_window_seconds=3,
+                challenge_interval_seconds=0,
+            ),
+        ),
+    )
+    server_thread.start()
+    assert challenge_ready.wait(timeout=2)
+    run_device(
+        DeviceConfig(
+            response_registry=response_path,
+            helper_registry=helper_path,
+            response_delay_seconds=5,
+        )
+    )
+    server_thread.join(timeout=2)
+
+    assert not server_thread.is_alive()
     assert any("timestamp expired" in entry for entry in logs)
-    results = [value for topic, value in published if topic.endswith("/result")]
-    assert results and set(results[-1]) == {"uid", "nonce", "status"}
-    assert results[-1]["status"] == "REJECT"
+    assert server_results
+    assert set(server_results[-1]) == {"uid", "nonce", "status"}
+    assert server_results[-1]["status"] == "REJECT"
+    assert clock["now"] == 1005
 
 
 def test_wrong_device_reconstruction_uses_crossed_registries(tmp_path):
@@ -447,8 +557,8 @@ def test_wrong_device_reconstruction_uses_crossed_registries(tmp_path):
     extractor.gen(golden_b, mask, "device-b", np.random.default_rng(13))
     response_path = tmp_path / "response.json"
     helper_path = tmp_path / "helper.json"
-    response_path.write_text(json.dumps({"device-b": {"response_bits": golden_b.tolist()}}))
+    response_path.write_text(json.dumps({"device-a": {"response_bits": golden_b.tolist()}}))
     helper_path.write_text(json.dumps({"device-a": helper_a}))
 
-    with pytest.raises((KeyError, ValueError)):
-        resolve_reconstructed_key("device-a", response_path, helper_path)
+    reconstructed = resolve_reconstructed_key("device-a", response_path, helper_path)
+    assert reconstructed != key_a
