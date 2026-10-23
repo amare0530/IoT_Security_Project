@@ -21,11 +21,12 @@ def test_d1_deterministic_rows_and_d2_group_spacing() -> None:
 def test_d3_and_d6_helpers_have_expected_shapes() -> None:
     goldens = np.zeros((4, 44), dtype=np.uint8)
     assert np.all(np.mean(np.delete(goldens, 0, axis=0), axis=0) == 0)
-    errors = [np.zeros(2816, dtype=np.uint8)]
-    positions = [np.arange(2816, dtype=np.int64)]
+    errors = [np.zeros(2816, dtype=np.uint8) for _ in range(8)]
+    positions = [np.arange(2816, dtype=np.int64) for _ in range(4)]
     assignments = evaluate_assignments(errors, positions)
     assert set(assignments["assignment"]) == {"current", "round_robin", "random"}
-    assert all(assignments.groupby("assignment").size() == 1)
+    assert all(assignments.groupby("assignment").size() == 8)
+    assert assignments["sample"].nunique() == 8
 
 
 def test_error_distribution_counts_all_seven_buckets() -> None:

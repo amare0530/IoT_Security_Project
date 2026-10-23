@@ -13,35 +13,43 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "export_demo_bundle.py"
 
 
-def _write_dataset(path: Path, boots: int = 4) -> np.ndarray:
+def _write_dataset(
+    path: Path, boots: int = 4, uids: tuple[str, ...] = ("demo-uid",)
+) -> np.ndarray:
     rng = np.random.default_rng(20261022)
     base = rng.integers(0, 256, size=81_920, dtype=np.uint8)
     base_bits = np.unpackbits(base)
-    boot_bits = []
-    for boot in range(boots):
-        bits = np.unpackbits(base.copy())
-        if boot < 2:
-            flip_indices = rng.choice(len(bits), size=3, replace=False)
-            flip_indices = flip_indices[flip_indices >= 10_000]
-        else:
-            flip_indices = np.array([0, 11, 22], dtype=np.int64)
-        bits[flip_indices] ^= 1
-        boot_bits.append(np.packbits(bits))
-
     rows = []
-    for boot in range(boots):
-        created_at = f"2026-01-01T00:0{boot}:00"
-        for address in range(160):
-            start = address * 4096
-            data = ",".join(str(value) for value in boot_bits[boot][start // 8 : (start + 4096) // 8])
-            rows.append(
-                {
-                    "uid": "demo-uid",
-                    "address": f"{address:03d}",
-                    "data": data,
-                    "created_at": created_at,
-                }
-            )
+    for uid_index, uid in enumerate(uids):
+        uid_base = base if uid_index == 0 else rng.integers(
+            0, 256, size=81_920, dtype=np.uint8
+        )
+        boot_bits = []
+        for boot in range(boots):
+            bits = np.unpackbits(uid_base.copy())
+            if boot < 2:
+                flip_indices = rng.choice(len(bits), size=3, replace=False)
+                flip_indices = flip_indices[flip_indices >= 10_000]
+            else:
+                flip_indices = np.array([0, 11, 22], dtype=np.int64)
+            bits[flip_indices] ^= 1
+            boot_bits.append(np.packbits(bits))
+        for boot in range(boots):
+            created_at = f"2026-01-01T00:0{boot}:00"
+            for address in range(160):
+                start = address * 4096
+                data = ",".join(
+                    str(value)
+                    for value in boot_bits[boot][start // 8 : (start + 4096) // 8]
+                )
+                rows.append(
+                    {
+                        "uid": uid,
+                        "address": f"{address:03d}",
+                        "data": data,
+                        "created_at": created_at,
+                    }
+                )
     pd.DataFrame(rows).to_csv(path, index=False)
     return base_bits
 
@@ -49,7 +57,7 @@ def _write_dataset(path: Path, boots: int = 4) -> np.ndarray:
 def _run(crps: Path, out: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--uid", "demo-uid", "--crps", str(crps),
-         "--out", str(out), "--train-boots", "2", *extra],
+         "--out", str(out), "--train-boots", "2", "--selection", "legacy", *extra],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -145,3 +153,39 @@ def test_device_files_reconstruct_registered_key_with_noise(tmp_path: Path) -> N
         for start in range(0, len(selected), 11)
     )
     assert differing_groups > 0
+
+
+def test_balanced_bundle_reconstructs_with_device_reader(tmp_path: Path) -> None:
+    crps = tmp_path / "crps.csv"
+    out = tmp_path / "bundle"
+    _write_dataset(crps, uids=("demo-uid", "other-uid"))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--uid",
+            "demo-uid",
+            "--crps",
+            str(crps),
+            "--out",
+            str(out),
+            "--train-boots",
+            "2",
+            "--seed",
+            "7",
+            "--selection",
+            "balanced",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, result.stderr
+    registry = pd.read_csv(out / "server" / "key_registry.csv")
+    reconstructed = resolve_reconstructed_key(
+        "demo-uid",
+        out / "device" / "response.json",
+        out / "device" / "helper_data.json",
+    )
+    assert reconstructed.hex() == registry.loc[0, "key_hex"]

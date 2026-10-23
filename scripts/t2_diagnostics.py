@@ -149,9 +149,13 @@ def distribution_summary(events: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def evaluate_assignments(error_masks: list[np.ndarray], positions: list[np.ndarray]) -> pd.DataFrame:
+def evaluate_assignments(
+    error_masks: list[np.ndarray], positions: list[np.ndarray]
+) -> pd.DataFrame:
     rows = []
-    for device, (errors, selected) in enumerate(zip(error_masks, positions)):
+    for sample, errors in enumerate(error_masks):
+        device = sample // 2
+        selected = positions[device]
         order = np.arange(SELECTED_BITS)
         assignments = {
             "current": order.reshape(256, 11),
@@ -162,6 +166,7 @@ def evaluate_assignments(error_masks: list[np.ndarray], positions: list[np.ndarr
             counts = errors[groups].sum(axis=1)
             rows.append({
                 "device": device,
+                "sample": sample,
                 "assignment": method,
                 "failed_groups": int(np.count_nonzero(counts >= 6)),
                 "groups_ge3": int(np.count_nonzero(counts >= 3)),
