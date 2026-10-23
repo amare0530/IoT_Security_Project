@@ -81,6 +81,21 @@ python scripts/demo_attack.py expired --uid device-001
 The `expired` helper can demonstrate an expired or missing-pending-challenge
 path, but cannot produce a valid tag without the device key.
 
+### Attack demonstration matrix
+
+| Attack | Command | Expected server log | Expected device display | Boundary |
+| --- | --- | --- | --- | --- |
+| Replay | `python scripts/demo_attack.py replay --uid device-001` | `replay: nonce already used` | The matching unauthenticated result may be printed | Reuses a captured response; it cannot create a valid new tag |
+| Forge | `python scripts/demo_attack.py forge --uid device-001` | `tag mismatch` | `REJECT`, then the legitimate result may be printed | Uses the real challenge nonce but a random tag |
+| Tamper | `python scripts/demo_attack.py tamper --uid device-001` | `challenge mismatch` | `REJECT`, then the legitimate result may be printed | Changes the nonce while retaining the captured tag |
+| Expired helper | `python scripts/demo_attack.py expired --uid device-001` | Usually `challenge mismatch` | Usually no matching result | Random nonce cannot reach timestamp validation; it does not possess a key |
+| Wrong device | Use UID-A helper data with UID-B response data in the integration test | `REJECT` | No valid authentication | Demonstrates device-specific reconstruction failure |
+| Response delay | Start device with `--response-delay 5` and server with `--time-window 3` | `timestamp expired` | `REJECT` | Demo-only delay; it does not give an attacker key material |
+
+The result topic is public and unauthenticated. The device only displays a
+result whose nonce matches its latest challenge; it never trusts that result
+to stop, retry, or change authentication behavior.
+
 ## Paper-Ready Docs
 - Architecture: `docs/ARCHITECTURE_PAPER_STYLE.md`
 - Experiment flow: `docs/EXPERIMENT_FLOW.md`

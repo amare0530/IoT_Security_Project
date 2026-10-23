@@ -161,11 +161,32 @@ def test_device_rep_failure_does_not_publish(monkeypatch, tmp_path):
     assert not [topic for topic, _ in clients[0].published if topic.endswith("/response")]
 
 
+def test_device_response_delay_is_applied_for_expiry_demo(monkeypatch, tmp_path):
+    _write_bundle(tmp_path)
+    clients = []
+    delays = []
+    monkeypatch.setattr("mqtt.device.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "mqtt.device.mqtt.Client",
+        lambda *a, **k: clients.append(DeviceClient()) or clients[-1],
+    )
+
+    run_device(
+        DeviceConfig(
+            response_registry=tmp_path / "response.json",
+            helper_registry=tmp_path / "helper.json",
+            response_delay_seconds=5,
+        )
+    )
+
+    assert delays == [5, 5]
+
+
 def test_device_cli_defaults_to_demo_bundle(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["mqtt.device"])
     config = parse_device_args()
-    assert str(config.response_registry).endswith("demo_bundle\\device\\response.json")
-    assert str(config.helper_registry).endswith("demo_bundle\\device\\helper_data.json")
+    assert config.response_registry == Path("demo_bundle/device/response.json")
+    assert config.helper_registry == Path("demo_bundle/device/helper_data.json")
 
 
 def test_insecure_device_path_warns(monkeypatch, tmp_path, capsys):
