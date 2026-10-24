@@ -94,7 +94,7 @@ def test_each_attack_payload_has_expected_shape():
     assert int(expired["timestamp"]) < 0 or len(expired["hmac"]) == 64
 
 
-def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
+def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch, capsys):
     from scripts import demo_attack
 
     class Message:
@@ -109,11 +109,14 @@ def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
             self.on_connect = None
             self.on_message = None
             self.published = []
+            self.callback_thread = None
+            self.publish_thread = None
 
         def subscribe(self, *args, **kwargs):
             pass
 
         def publish(self, topic, payload, **kwargs):
+            self.publish_thread = threading.get_ident()
             self.published.append((topic, json.loads(payload)))
             return PublishInfo()
 
@@ -121,6 +124,7 @@ def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
             def notify():
                 self.on_connect(self, None, None, 0, None)
                 time.sleep(0.01)
+                self.callback_thread = threading.get_ident()
                 self.on_message(self, None, Message())
 
             threading.Timer(0.05, notify).start()
@@ -147,3 +151,5 @@ def test_forge_waits_for_delayed_connack_and_challenge(monkeypatch):
     )
     demo_attack.run_attack(args)
     assert DelayedClient.instance.published
+    assert DelayedClient.instance.publish_thread != DelayedClient.instance.callback_thread
+    assert "Attack failed" not in capsys.readouterr().err
