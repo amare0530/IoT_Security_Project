@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -30,6 +31,7 @@ class DeviceConfig:
     response_registry: Path | None = Path("demo_bundle/device/response.json")
     helper_registry: Path | None = Path("demo_bundle/device/helper_data.json")
     result_topic: str = "iot/auth/result"
+    response_delay_seconds: float = 0
 
 
 def build_response_payload(
@@ -94,6 +96,9 @@ def run_device(config: DeviceConfig) -> None:
         last_challenge_nonce = challenge["nonce"]
         key_buffer: bytearray | None = None
         try:
+            if config.response_delay_seconds:
+                # Demo-only delay for exercising server timestamp expiry.
+                time.sleep(config.response_delay_seconds)
             if use_insecure_key:
                 key = resolve_key_bytes(
                     uid=config.uid,
@@ -164,6 +169,12 @@ def parse_args() -> DeviceConfig:
     parser.add_argument("--result-topic", default="iot/auth/result")
     parser.add_argument("--challenge-topic", default="iot/auth/challenge")
     parser.add_argument("--response-topic", default="iot/auth/response")
+    parser.add_argument(
+        "--response-delay",
+        type=float,
+        default=0,
+        help="demo-only delay before responding, in seconds",
+    )
     args = parser.parse_args()
     return DeviceConfig(
         broker=args.broker,
@@ -176,6 +187,7 @@ def parse_args() -> DeviceConfig:
         result_topic=args.result_topic,
         challenge_topic=args.challenge_topic,
         response_topic=args.response_topic,
+        response_delay_seconds=args.response_delay,
     )
 
 

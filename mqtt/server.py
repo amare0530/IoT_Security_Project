@@ -128,10 +128,10 @@ def run_server(config: ServerConfig) -> None:
         try:
             payload = json.loads(message.payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
-            print("Server ignored malformed MQTT payload")
+            print("REJECT invalid challenge payload: malformed MQTT payload")
             return
         if not isinstance(payload, dict):
-            print("Server ignored non-object MQTT payload")
+            print("REJECT invalid challenge payload: non-object MQTT payload")
             return
         uid = payload.get("uid", "")
 
