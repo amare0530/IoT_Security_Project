@@ -66,12 +66,12 @@ def _load_uid_record(path: Path, uid: str) -> object:
     raise KeyError(f"uid not found in PUF registry: {uid}")
 
 
-def resolve_reconstructed_key(
+def load_reconstruction_inputs(
     uid: str,
     response_registry: Path,
     helper_registry: Path,
-) -> bytes:
-    """Reconstruct a device key from response bits and public helper data."""
+) -> tuple[np.ndarray, dict]:
+    """Load one device's SRAM response bits and its public helper data."""
     response_record = _load_uid_record(response_registry, uid)
     helper_record = _load_uid_record(helper_registry, uid)
 
@@ -82,7 +82,18 @@ def resolve_reconstructed_key(
     if not isinstance(helper_record, dict):
         raise ValueError("helper registry record must be an object")
 
-    response_bits = np.asarray(response_record, dtype=np.uint8)
+    return np.asarray(response_record, dtype=np.uint8), helper_record
+
+
+def resolve_reconstructed_key(
+    uid: str,
+    response_registry: Path,
+    helper_registry: Path,
+) -> bytes:
+    """Reconstruct a device key from response bits and public helper data."""
+    response_bits, helper_record = load_reconstruction_inputs(
+        uid, response_registry, helper_registry
+    )
     extractor = FuzzyExtractor(
         bits_needed=helper_record["bits_needed"],
         repetition=helper_record["repetition"],

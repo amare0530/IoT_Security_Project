@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "demo: server",
+      "type": "shell",
+      "command": "python3 -m demo.server",
+      "windows": { "command": "py -3.11 -m demo.server" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "live-demo", "panel": "dedicated", "focus": false, "clear": true }
+    },
+    {
+      "label": "demo: device",
+      "type": "shell",
+      "command": "python3 -m demo.device",
+      "windows": { "command": "py -3.11 -m demo.device" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "live-demo", "panel": "dedicated", "focus": true, "clear": true }
+    },
+    {
+      "label": "demo: hacker",
+      "type": "shell",
+      "command": "python3 -m demo.hacker",
+      "windows": { "command": "py -3.11 -m demo.hacker" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "live-demo", "panel": "dedicated", "focus": false, "clear": true }
+    },
+    {
+      "label": "demo: 全部啟動 (server + device + hacker)",
+      "dependsOn": ["demo: server", "demo: device", "demo: hacker"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "demo: broker (本機還沒有 Mosquitto 在跑才需要)",
+      "type": "shell",
+      "command": "mosquitto -c mosquitto-demo.conf -v",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "focus": false }
+    },
+    {
+      "label": "demo: 產生合成排練資料 (不是真實 SRAM)",
+      "type": "shell",
+      "command": "python3 -m demo.make_synthetic_bundle --out demo_bundle",
+      "windows": { "command": "py -3.11 -m demo.make_synthetic_bundle --out demo_bundle" },
+      "problemMatcher": []
+    }
+  ]
+}

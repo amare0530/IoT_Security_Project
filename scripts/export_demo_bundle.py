@@ -37,6 +37,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int)
     parser.add_argument("--selection", choices=("balanced", "legacy"), default="balanced")
     parser.add_argument("--population-cache", type=Path)
+    parser.add_argument(
+        "--attacker-uid",
+        help="also export one boot of this other device for the wrong-chip demo",
+    )
     return parser.parse_args()
 
 
@@ -154,6 +158,20 @@ only; it must not contain the registered key.
     (out_dir / "README.txt").write_text(readme, encoding="utf-8")
 
 
+def _write_attacker_response(
+    df, out_dir: Path, attacker_uid: str, train_boots: int
+) -> np.ndarray:
+    """Export one SRAM boot of a different device; no key or helper data."""
+    boots, matrix = _boot_matrix(df, attacker_uid)
+    boot = matrix[min(train_boots, len(boots) - 1)]
+    attacker_dir = out_dir / "attacker"
+    attacker_dir.mkdir(parents=True, exist_ok=True)
+    with (attacker_dir / "response.json").open("w", encoding="utf-8") as handle:
+        json.dump({attacker_uid: {"response_bits": boot.tolist()}}, handle)
+        handle.write("\n")
+    return np.asarray(boot, dtype=np.uint8)
+
+
 def _print_verification(
     extractor: FuzzyExtractor,
     golden: np.ndarray,
@@ -194,6 +212,9 @@ def export_bundle(args: argparse.Namespace) -> None:
         raise ValueError("--threshold must be greater than 0 and at most 1")
     if not args.crps.exists():
         raise FileNotFoundError(f"CRPS input not found: {args.crps}")
+
+    if args.attacker_uid is not None and args.attacker_uid == args.uid:
+        raise ValueError("--attacker-uid must be a different device than --uid")
 
     df = load_dataset(args.crps)
     boots, matrix = _boot_matrix(df, args.uid)
@@ -265,6 +286,15 @@ def export_bundle(args: argparse.Namespace) -> None:
         raise ValueError("sram_boot must contain only 0 and 1")
 
     _write_bundle(args.out, args.uid, registered_key, helper_data, first_holdout)
+    if args.attacker_uid is not None:
+        other = _write_attacker_response(
+            df, args.out, args.attacker_uid, args.train_boots
+        )
+        wrong = extractor.rep(other, helper_data)
+        print(
+            f"wrong-chip check: key from uid={args.attacker_uid} matches registered="
+            f"{'yes' if wrong == registered_key else 'no'}"
+        )
     _print_verification(
         extractor,
         golden,

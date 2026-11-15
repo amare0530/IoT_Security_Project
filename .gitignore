@@ -33,3 +33,4 @@ artifacts/docx_media_review/
 runs/
 demo-output/
 demo_bundle/
+demo_bundle_synthetic/
