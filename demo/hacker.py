@@ -27,8 +27,9 @@ WEAK_LOGIN_TOPIC = "iot/weak/login"
 WEAK_RESULT_TOPIC = "iot/weak/result"
 FIELDS = ("uid", "nonce", "timestamp", "hmac")
 MENU = (
-    "1=重放側錄到的封包   2=自己改封包再送   3=連續亂猜 1000 次\n"
-    "4=破解對照組的 4 位數密碼   直接打任何字=當成密碼送出   q=結束"
+    "1=重放側錄到的封包    2=自己改封包再送\n"
+    "3=連續亂猜 1000 次    4=破解對照組密碼\n"
+    "直接打任何字=當成密碼送出    q=結束"
 )
 
 
@@ -112,9 +113,10 @@ class Hacker:
             return
         self.captured = payload
         if not self.quiet:
-            ui.say("  [側錄] response   " + "  ".join(
-                f"{field}={ui.short(payload.get(field), 6)}" for field in FIELDS), "yellow")
-            ui.say("         封包裡沒有金鑰，只有這四個欄位", "dim")
+            ui.say("  [側錄] response", "yellow")
+            for field in FIELDS:
+                ui.say(f"         {field:<9} {ui.short(payload.get(field), 10)}", "yellow")
+            ui.say("         只有這四個欄位，沒有金鑰", "dim")
 
     # -- sending -------------------------------------------------------------
     def send(self, packet: dict) -> None:
@@ -130,11 +132,11 @@ class Hacker:
             return None
         return self.last_challenge
 
-    def attack(self, packets: list[dict], label: str) -> None:
+    def attack(self, packets: list[dict], label: str, wait: float = 2.5) -> None:
         before = dict(self.results)
         for packet in packets:
             self.send(packet)
-        deadline = time.monotonic() + self.args.timeout
+        deadline = time.monotonic() + wait
         expected = len(packets)
         while time.monotonic() < deadline:
             got = sum(self.results.values()) - sum(before.values())
@@ -149,8 +151,9 @@ class Hacker:
         if accepted:
             ui.banner(f"{label}：成功 {accepted} 次", True)
         else:
-            note = f"，{silent} 個封包 Server 沒有回應（直接丟棄）" if silent > 0 else ""
-            ui.banner(f"{label}：被拒絕 {rejected} 次{note}", False)
+            ui.banner(f"{label}：被拒絕 {rejected:,} 次", False)
+            if silent > 0:
+                ui.say(f"  另有 {silent:,} 個封包 Server 直接丟棄、沒有回覆", "dim")
         ui.say(f"  累計攻擊 {self.attacks:,} 次，成功 {self.wins} 次", "bold")
 
     # -- commands ------------------------------------------------------------
@@ -165,7 +168,7 @@ class Hacker:
         challenge = self.fresh_challenge()
         if challenge is None:
             return
-        ui.say(f"  用「{ui.short(value, 12)}」當作 hmac 回答新的 challenge", "cyan")
+        ui.say(f"  用「{ui.short(value, 12)}」當作 hmac 送出", "cyan")
         self.attack([build_packet(challenge, value)], "猜密碼")
 
     def craft(self) -> None:
@@ -174,15 +177,16 @@ class Hacker:
             return
         stolen = self.captured.get("hmac", "") if self.captured else random_tag()
         packet = build_packet(challenge, str(stolen))
-        ui.say("  目前的封包（hmac 是側錄來的舊 tag，拿來回答新的 challenge）：", "cyan")
+        ui.say("  拿側錄到的舊 hmac 回答新的 challenge：", "cyan")
         for field in FIELDS:
-            ui.say(f"    {field:<9} {packet[field]}")
-        field = input("  要改哪一欄？uid / nonce / timestamp / hmac（直接 Enter 不改）> ").strip().lower()
+            ui.say(f"    {field:<9} {ui.short(packet[field], 14)}")
+        ui.say("  要改哪一欄？uid / nonce / timestamp / hmac")
+        field = input("  （直接 Enter 不改）> ").strip().lower()
         if field:
             if field not in FIELDS:
                 ui.say("  沒有這個欄位", "red")
                 return
-            value = input("  新的值（直接 Enter = 隨機）> ").strip()
+            value = input("  新的值（Enter=隨機）> ").strip()
             packet = edit_packet(packet, field, value)
         self.attack([packet], "偽造封包")
 
@@ -190,15 +194,20 @@ class Hacker:
         challenge = self.fresh_challenge()
         if challenge is None:
             return
-        ui.say(f"  對同一個 challenge 連續亂猜 {count:,} 個 hmac（可能的 tag 有 2^256 種）", "cyan")
+        ui.say(f"  連續亂猜 {count:,} 個 hmac", "cyan")
+        ui.say("  （可能的 tag 有 2^256 種）", "dim")
         self.quiet = True
         try:
-            self.attack([build_packet(challenge, random_tag()) for _ in range(count)], "暴力亂猜")
+            self.attack(
+                [build_packet(challenge, random_tag()) for _ in range(count)],
+                "暴力亂猜",
+                wait=max(self.args.timeout, 10),
+            )
         finally:
             self.quiet = False
 
     def crack_weak_pin(self) -> None:
-        ui.say("  對照組：沒有 PUF、沒有 challenge，只靠 4 位數密碼", "cyan")
+        ui.say("  對照組：只靠 4 位數密碼，沒有 PUF", "cyan")
         self.weak_hit.clear()
         self.weak_pin = None
         self.weak_replies = 0
@@ -210,15 +219,15 @@ class Hacker:
             self.client.publish(WEAK_LOGIN_TOPIC, json.dumps({"pin": pin}), qos=0)
             tried += 1
             if number % 41 == 0:
-                ui.say(f"\r  嘗試中  {pin}   已送出 {tried:,} / 10,000 ", "yellow", end="")
+                ui.say(f"\r  嘗試中 {pin}  已送出 {tried:,} ", "yellow", end="")
                 ui.pause(0.012)
         self.weak_hit.wait(timeout=self.args.timeout)
         ui.say()
         if self.weak_pin is None:
-            ui.say("  沒有收到對照組的回應，確認 server 是否已啟動", "red")
+            ui.say("  沒有收到對照組的回應，檢查 server", "red")
         else:
             ui.banner(f"密碼是 {self.weak_pin}，冒充成功", True)
-            ui.say("  4 位數只有 10,000 種可能，幾秒就試完", "dim")
+            ui.say("  4 位數只有 10,000 種，幾秒就試完", "dim")
 
     def handle(self, line: str) -> bool:
         text = line.strip()
@@ -239,7 +248,7 @@ class Hacker:
         return True
 
     def run(self) -> None:
-        ui.rule("HACKER  (沒有金鑰、沒有 helper data，只能側錄與發送封包)")
+        ui.rule("HACKER  沒有金鑰，只能側錄與發送封包")
         self.client.connect(self.args.broker, self.args.port, keepalive=60)
         self.client.loop_start()
         ui.say(f"  已連上 broker {self.args.broker}:{self.args.port}，開始側錄", "dim")

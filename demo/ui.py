@@ -12,6 +12,7 @@ _CODES = {
     "bg_red": "41", "bg_green": "42", "bg_yellow": "43",
 }
 _state = {"color": False, "speed": 1.0}
+WIDTH = 46  # fits three side-by-side VS Code terminals at a projector font size
 
 
 def setup(fast: bool = False) -> None:
@@ -44,13 +45,13 @@ def say(text: str = "", *styles: str, end: str = "\n") -> None:
 
 
 def rule(title: str = "") -> None:
-    line = "─" * 62
+    line = "─" * WIDTH
     say(f"{line}\n {title}" if title else line, "dim")
 
 
 def banner(text: str, ok: bool) -> None:
     """Three-line coloured block that can be read from the back of a room."""
-    width = 62
+    width = WIDTH
     style = "bg_green" if ok else "bg_red"
     blank = " " * width
     say(blank, style)

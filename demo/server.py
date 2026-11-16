@@ -163,9 +163,7 @@ class DemoServer:
     # -- display ------------------------------------------------------------
     def show_decision(self, payload: object, reason: str | None) -> None:
         with self.lock:
-            now = time.monotonic()
-            in_burst = reason is not None and now - self.last_decision < 0.4
-            self.last_decision = now
+            in_burst = reason is not None and time.monotonic() - self.last_decision < 0.4
             if reason is None:
                 self.accepted += 1
             else:
@@ -173,6 +171,7 @@ class DemoServer:
             if in_burst:
                 self.burst += 1
                 ui.say(f"\r  ✗ REJECT ×{self.burst + 1}  {reason}   ", "red", end="")
+                self.last_decision = time.monotonic()
                 return
             self.end_burst()
             failed = gate_index(reason)
@@ -185,8 +184,9 @@ class DemoServer:
                 if failed is not None and index > failed:
                     ui.say(f"  ·  第 {index + 1} 關  {label}（未檢查）", "dim")
                 elif failed == index:
-                    ui.say(f"  ✗  第 {index + 1} 關  {label}   ← {reason}", "red", "bold")
-                    ui.say(f"       程式位置 {source_line(reason)}", "dim")
+                    ui.say(f"  ✗  第 {index + 1} 關  {label}", "red", "bold")
+                    ui.say(f"       原因 {reason}", "red")
+                    ui.say(f"       程式 {source_line(reason)}", "dim")
                 else:
                     ui.say(f"  ✓  第 {index + 1} 關  {label}", "green")
             if failed is None:
@@ -194,6 +194,7 @@ class DemoServer:
             else:
                 ui.banner(f"REJECT  停在第 {failed + 1} 關", False)
             ui.say(f"  累計  通過 {self.accepted}  拒絕 {self.rejected}", "dim")
+            self.last_decision = time.monotonic()
 
     def end_burst(self) -> None:
         if self.burst:
@@ -218,12 +219,13 @@ class DemoServer:
             ui.say(f"\r  對照組：已擋下 {self.weak_attempts} 次錯誤密碼 ", "yellow", end="")
 
     def run(self) -> None:
-        ui.rule("SERVER  (判定邏輯：mqtt/server.py  classify_response)")
+        ui.rule("SERVER  判定邏輯 mqtt/server.py")
         ui.say(f"  讀取金鑰登錄表  {self.registry}")
         ui.say(f"  設備 UID        {self.uid}")
-        ui.say(f"  登錄金鑰指紋    {fingerprint(self.key)}（只顯示指紋，金鑰不顯示）")
+        ui.say(f"  登錄金鑰指紋    {fingerprint(self.key)}")
+        ui.say("                  （只顯示指紋，不顯示金鑰）", "dim")
         ui.say(f"  時間視窗        {self.args.time_window} 秒")
-        ui.say("  對照組          4 位數密碼登入已啟用（無防護，僅供對照）", "yellow")
+        ui.say("  對照組          4 位數密碼登入（無防護）", "yellow")
         self.client.connect(self.args.broker, self.args.port, keepalive=60)
         self.client.loop_start()
         try:

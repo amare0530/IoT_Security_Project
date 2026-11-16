@@ -29,7 +29,7 @@ from puf.fuzzy_extractor import FuzzyExtractor
 from puf.key_provider import load_reconstruction_inputs
 
 CONTROL_TOPIC = "iot/auth/demo/control"
-HELP = "Enter=開機認證   n 5=加 5% 雜訊後認證   x=換成別顆晶片   q=結束"
+HELP = "Enter=開機認證  n 5=加5%雜訊  x=換晶片  q=結束"
 
 
 def only_uid_in_helper(path: Path) -> str:
@@ -80,7 +80,7 @@ def dissent(votes: np.ndarray, repetition: int) -> np.ndarray:
 
 def show_votes(votes: np.ndarray, repetition: int) -> None:
     losing = dissent(votes, repetition)
-    row = 64
+    row = 32
     for start in range(0, len(losing), row):
         line = []
         for value in losing[start : start + row]:
@@ -91,12 +91,10 @@ def show_votes(votes: np.ndarray, repetition: int) -> None:
             else:
                 line.append(ui.paint("█", "red"))
         ui.say("  " + "".join(line))
-        ui.pause(0.25)
-    ui.say(
-        f"  {ui.paint('█', 'green')} {int((losing == 0).sum())} 組全票一致   "
-        f"{ui.paint('█', 'yellow')} {int(((losing > 0) & (losing <= 2)).sum())} 組有雜訊、多數決救回   "
-        f"{ui.paint('█', 'red')} {int((losing > 2).sum())} 組票數接近"
-    )
+        ui.pause(0.15)
+    ui.say(f"  {ui.paint('█', 'green')} {int((losing == 0).sum()):>3} 組  11 票全部一致")
+    ui.say(f"  {ui.paint('█', 'yellow')} {int(((losing > 0) & (losing <= 2)).sum()):>3} 組  有雜訊，多數決救回")
+    ui.say(f"  {ui.paint('█', 'red')} {int((losing > 2).sum()):>3} 組  票數接近，結果不可靠")
 
 
 class DemoDevice:
@@ -147,23 +145,26 @@ class DemoDevice:
                 self.uid, self.args.response_registry, self.args.helper_registry
             )
             indices = np.asarray(helper["stable_indices"], dtype=np.int64)
-            ui.say(f"  SRAM {len(bits):,} 位元，取用 {len(indices):,} 個穩定位元 "
-                   f"= {helper['bits_needed']} 個金鑰位元 × {helper['repetition']} 票")
+            ui.say(f"  SRAM 共 {len(bits):,} 位元")
+            ui.say(f"  取用 {len(indices):,} 個穩定位元 "
+                   f"= {helper['bits_needed']} 金鑰位元 × {helper['repetition']} 票")
             if mode["chip"] == "other":
                 bits = load_other_chip(self.args.other_chip)
-                ui.say(f"  ！改用別顆晶片的 SRAM 開機值  {self.args.other_chip}", "yellow", "bold")
+                ui.say("  ！改用別顆晶片的 SRAM 開機值", "yellow", "bold")
+                ui.say(f"    {self.args.other_chip}", "yellow")
             if mode["noise"] > 0:
                 bits, flipped = add_noise(bits, indices, mode["noise"], self.rng)
                 ui.say(f"  ！人工翻轉 {flipped} / {len(indices)} 個位元"
                        f"（{mode['noise']:.0%} 雜訊）", "yellow", "bold")
-            ui.say("  Rep()：每個金鑰位元 11 票多數決  (puf/fuzzy_extractor.py  rep)")
+            ui.say("  Rep()：每個金鑰位元 11 票多數決")
+            ui.say("  puf/fuzzy_extractor.py  rep()", "dim")
             show_votes(vote_tally(bits, helper), helper["repetition"])
             extractor = FuzzyExtractor(
                 bits_needed=helper["bits_needed"], repetition=helper["repetition"]
             )
             key_buffer = bytearray(extractor.rep(bits, helper))
-            ui.say(f"  重建金鑰指紋    {hashlib.sha256(bytes(key_buffer)).hexdigest()[:8]}"
-                   "（與 Server 那邊的指紋比對）")
+            ui.say(f"  重建金鑰指紋    {hashlib.sha256(bytes(key_buffer)).hexdigest()[:8]}", "bold")
+            ui.say("  （和 Server 面板的指紋比對）", "dim")
             response = build_response_payload(
                 self.authenticator, bytes(key_buffer), self.uid, challenge
             )
@@ -177,7 +178,7 @@ class DemoDevice:
             if key_buffer is not None:
                 for index in range(len(key_buffer)):
                     key_buffer[index] = 0
-                ui.say("  金鑰已從記憶體清除（Python 只能盡力而為）", "dim")
+                ui.say("  金鑰已從記憶體清除（盡力而為）", "dim")
 
     def boot(self, noise: float = 0.0, chip: str = "own") -> None:
         ui.rule("開機，向 Server 請求認證")
@@ -186,7 +187,7 @@ class DemoDevice:
         self.client.publish(CONTROL_TOPIC, json.dumps({"cmd": "challenge"}), qos=1)
         if not self.done.wait(timeout=self.args.timeout):
             self.armed = None
-            ui.say("  等不到 Server 回應，確認 broker 與 server 是否已啟動", "red")
+            ui.say("  等不到 Server 回應，檢查 broker 與 server", "red")
 
     def handle(self, line: str) -> bool:
         """Run one typed command. Returns False to quit."""
@@ -214,9 +215,10 @@ class DemoDevice:
         return True
 
     def run(self) -> None:
-        ui.rule("DEVICE  (金鑰重建：puf/fuzzy_extractor.py  rep)")
+        ui.rule("DEVICE  金鑰重建 puf/fuzzy_extractor.py")
         ui.say(f"  設備 UID   {self.uid}")
-        ui.say("  本機只有 helper data 與 SRAM 開機值，沒有存金鑰")
+        ui.say("  本機只有 helper data 與 SRAM 開機值")
+        ui.say("  沒有存金鑰")
         self.client.connect(self.args.broker, self.args.port, keepalive=60)
         self.client.loop_start()
         try:
