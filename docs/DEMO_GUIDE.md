@@ -16,7 +16,7 @@ python scripts/run_offline_demo.py --output-dir demo-output
 最簡單的方法是雙擊專案根目錄的 `start_web_demo.bat`。也可以執行：
 
 ```powershell
-python scripts/run_web_demo.py
+python archive/run_web_demo.py
 ```
 
 瀏覽器通常會自動開啟 `http://127.0.0.1:8765`。若沒有自動開啟，請手動輸入網址。
@@ -31,7 +31,7 @@ python scripts/run_web_demo.py
 若要讓同一網路上的其他電腦開啟頁面，可以執行：
 
 ```powershell
-python scripts/run_web_demo.py --host 0.0.0.0
+python archive/run_web_demo.py --host 0.0.0.0
 ```
 
 再用執行展示程式電腦的區域網路 IP 加上 `:8765` 開啟。一般展示優先使用
@@ -73,3 +73,7 @@ python scripts/run_identity_lab.py --auto-local-data
 
 程式會在程序內快取已載入的資料矩陣，之後隨機選擇合法 UID，不會每次按鈕都重新
 讀取大型 CSV。沒有資料集時則使用合成 fixture。
+
+## 口試現場展示
+
+三個終端機的互動展示（Device、Server、Hacker）見 `docs/LIVE_DEMO.md`。
